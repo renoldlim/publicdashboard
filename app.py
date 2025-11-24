@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import datetime
-import re
 import math
 
 # --------------------------
@@ -196,6 +195,14 @@ def save_suggestions(df_sug: pd.DataFrame):
 
 df = load_data()
 
+# init session state
+if "page" not in st.session_state:
+    st.session_state["page"] = 1
+if "koreksi_target_org" not in st.session_state:
+    st.session_state["koreksi_target_org"] = None
+if "pending_tab" not in st.session_state:
+    st.session_state["pending_tab"] = None
+
 # --------------------------
 # 3. HEADER + LOGO
 # --------------------------
@@ -231,7 +238,7 @@ with tab_dir:
 
     fcol1, fcol2 = st.columns([1, 3])
 
-    # --- Filter ---
+    # --- Filter widgets (kolom kiri) ---
     with fcol1:
         st.markdown("#### 🔎 Filter")
         name = st.text_input("Cari Nama Organisasi")
@@ -241,8 +248,13 @@ with tab_dir:
         selected_categories = st.multiselect("Kategori Layanan", all_categories)
 
         if st.button("Reset filter"):
+            name = ""
+            addr = ""
+            selected_categories = []
+            st.session_state["page"] = 1
             st.rerun()
 
+    # --- Terapkan filter ---
     filtered = df.copy()
 
     if name:
@@ -261,38 +273,59 @@ with tab_dir:
     total_count = len(df)
     filtered_count = len(filtered)
 
+    # --- Pagination controls (kolom kiri, di bawah filter) ---
+    page_size = 10
+    total_pages = max(1, math.ceil(max(filtered_count, 1) / page_size))
+
+    # pastikan page tidak out of range
+    if st.session_state["page"] > total_pages:
+        st.session_state["page"] = total_pages
+    if st.session_state["page"] < 1:
+        st.session_state["page"] = 1
+
+    with fcol1:
+        if filtered_count > 0:
+            st.markdown("#### Halaman")
+            prev_col, mid_col, next_col = st.columns([1, 2, 1])
+
+            with prev_col:
+                if st.button("◀", disabled=st.session_state["page"] <= 1):
+                    st.session_state["page"] -= 1
+                    st.rerun()
+
+            with mid_col:
+                st.markdown(
+                    f"<div style='text-align:center;'>Halaman "
+                    f"<b>{st.session_state['page']}</b> / {total_pages}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            with next_col:
+                if st.button("▶", disabled=st.session_state["page"] >= total_pages):
+                    st.session_state["page"] += 1
+                    st.rerun()
+
+    # --- Konten utama (kolom kanan) ---
     with fcol2:
         st.markdown(
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
         )
-
         st.markdown("---")
 
         if filtered_count == 0:
             st.info("Belum ada lembaga yang cocok dengan filter.")
         else:
-            # ---------- PAGINATION ----------
             cards_df = filtered.reset_index(drop=True)
-            page_size = 10
-            total_pages = max(1, math.ceil(len(cards_df) / page_size))
 
-            col_page, col_info = st.columns([1, 3])
-            with col_page:
-                page = st.number_input(
-                    "Halaman",
-                    min_value=1,
-                    max_value=total_pages,
-                    value=1,
-                    step=1,
-                )
-
-            with col_info:
-                st.caption(f"Menampilkan lembaga nomor {(page-1)*page_size+1}–"
-                           f"{min(page*page_size, len(cards_df))} dari {len(cards_df)} hasil.")
-
+            page = st.session_state["page"]
             start_idx = (page - 1) * page_size
             end_idx = start_idx + page_size
             page_df = cards_df.iloc[start_idx:end_idx]
+
+            st.caption(
+                f"Menampilkan lembaga nomor {start_idx+1}–"
+                f"{min(end_idx, len(cards_df))} dari {len(cards_df)} hasil."
+            )
 
             # ---------- CARD VIEW (10 per page) ----------
             n_cols = 2 if len(page_df) > 1 else 1
@@ -301,7 +334,7 @@ with tab_dir:
                 cols = st.columns(n_cols)
                 chunk = page_df.iloc[i:i + n_cols]
 
-                for col, (_, row) in zip(cols, chunk.iterrows()):
+                for col, (idx_row, row) in zip(cols, chunk.iterrows()):
                     with col:
                         nama = safe_str(row.get("Nama Organisasi", ""))
                         alamat = safe_str(row.get("Alamat Organisasi", ""))
@@ -310,7 +343,9 @@ with tab_dir:
                         kategori = row.get("kategori_layanan", [])
 
                         if isinstance(kategori, str):
-                            kategori_list = [k.strip() for k in kategori.split(",") if k.strip()]
+                            kategori_list = [
+                                k.strip() for k in kategori.split(",") if k.strip()
+                            ]
                         else:
                             kategori_list = kategori or []
 
@@ -343,11 +378,20 @@ with tab_dir:
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
 
+                        # Tombol kecil untuk usulkan koreksi
+                        if st.button(
+                            "✏️ Usulkan koreksi",
+                            key=f"suggest_{start_idx + idx_row}",
+                        ):
+                            st.session_state["koreksi_target_org"] = nama
+                            st.session_state["pending_tab"] = "koreksi"
+                            st.rerun()
+
             # ---------- EXPANDER: FULL TABLE + DOWNLOAD ----------
             with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
                 table_df = filtered.copy()
 
-                cols = [c for c in [
+                cols_table = [c for c in [
                     "Nama Organisasi",
                     "Alamat Organisasi",
                     "Kontak Lembaga/Layanan",
@@ -355,7 +399,7 @@ with tab_dir:
                     "kategori_layanan",
                 ] if c in table_df.columns]
 
-                table_df = table_df[cols].copy()
+                table_df = table_df[cols_table].copy()
 
                 if "kategori_layanan" in table_df.columns:
                     def cat_to_text(x):
@@ -407,10 +451,20 @@ with tab_koreksi:
         """
     )
 
+    # default lembaga dari tombol "Usulkan koreksi"
+    org_options = sorted(df["Nama Organisasi"].dropna().unique())
+    default_org = st.session_state.get("koreksi_target_org", None)
+    if default_org in org_options:
+        default_index = org_options.index(default_org)
+    else:
+        default_index = 0 if org_options else 0
+
     with st.form("suggest_form"):
         org_name = st.selectbox(
             "Pilih lembaga yang ingin dikoreksi",
-            sorted(df["Nama Organisasi"].dropna().unique()),
+            org_options,
+            index=default_index,
+            key="koreksi_org_select",
         )
         pengaju = st.text_input("Nama Anda")
         kontak = st.text_input("Kontak (email / WA)")
@@ -563,3 +617,20 @@ with tab_about:
         - Hasil verifikasi lapangan dan koordinasi jaringan.
         """
     )
+
+# --------------------------
+# JS HACK: AUTO PINDAH TAB KE "KOREKSI DATA"
+# --------------------------
+if st.session_state.get("pending_tab") == "koreksi":
+    # tab index 1 = Koreksi Data
+    st.markdown(
+        """
+        <script>
+        const tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+        if (tabs.length > 1) { tabs[1].click(); }
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+    # clear flag supaya tidak lompat terus
+    st.session_state["pending_tab"] = None
