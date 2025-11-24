@@ -18,6 +18,12 @@ FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"
 # Contoh: "https://docs.google.com/forms/d/e/XXX/viewform?embedded=true"
 GOOGLE_FORM_EMBED_URL = "https://docs.google.com/forms/d/XXXXX/viewform?embedded=true"
 
+st.set_page_config(
+    page_title="Direktori Layanan FPL",
+    page_icon="📚",
+    layout="wide",
+)
+
 st.markdown(
     """
     <style>
