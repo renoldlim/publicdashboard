@@ -24,6 +24,12 @@ st.set_page_config(
     layout="wide",
 )
 
+st.set_page_config(
+    page_title="Direktori Layanan FPL",
+    page_icon="📚",
+    layout="wide",
+)
+
 st.markdown(
     """
     <style>
@@ -32,10 +38,6 @@ st.markdown(
         padding-bottom: 2rem;
     }
     .sidebar-content {
-        padding-top: 1rem;
-    }
-    /* Tambah jarak di dalam panel tab, supaya judul tidak nempel & kepotong */
-    .stTabs [data-baseweb="tab-panel"] {
         padding-top: 1rem;
     }
     </style>
