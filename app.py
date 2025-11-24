@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import datetime
 
 # --------------------------
 # CONFIG & CONSTANTS
@@ -13,23 +14,9 @@ st.set_page_config(
 
 DATA_PATH = Path(__file__).parent / "fpl database.csv"
 FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"
+SUGGEST_PATH = Path(__file__).parent / "edit_suggestions.csv"
 
-# Ganti dengan URL Google Form kamu (versi embed)
-# Contoh: "https://docs.google.com/forms/d/e/XXX/viewform?embedded=true"
-GOOGLE_FORM_EMBED_URL = "https://docs.google.com/forms/d/XXXXX/viewform?embedded=true"
-
-st.set_page_config(
-    page_title="Direktori Layanan FPL",
-    page_icon="📚",
-    layout="wide",
-)
-
-st.set_page_config(
-    page_title="Direktori Layanan FPL",
-    page_icon="📚",
-    layout="wide",
-)
-
+# CSS: rapikan layout + turunkan isi tab sedikit
 st.markdown(
     """
     <style>
@@ -40,13 +27,17 @@ st.markdown(
     .sidebar-content {
         padding-top: 1rem;
     }
+    /* Tambah jarak isi tab dari garis tab, supaya judul tidak kepotong */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # --------------------------
-# LOAD & PREPARE DATA
+# 1. LOAD & PREPARE DATA UTAMA
 # --------------------------
 @st.cache_data
 def load_data():
@@ -66,7 +57,7 @@ def load_data():
     else:
         df["layanan_list"] = [[] for _ in range(len(df))]
 
-    # mapping ke kategori
+    # mapping layanan ke kategori
     def classify_service(s: str):
         s_low = s.lower()
         cats = set()
@@ -104,10 +95,35 @@ def load_data():
     return df
 
 
+def load_suggestions():
+    """Selalu baca file koreksi terbaru (tanpa cache)."""
+    if SUGGEST_PATH.exists():
+        return pd.read_csv(SUGGEST_PATH)
+    else:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "timestamp",
+                "organisasi",
+                "pengaju",
+                "kontak",
+                "kolom",
+                "usulan",
+                "status",
+                "processed_at",
+            ]
+        )
+
+
+def save_suggestions(df_sug):
+    df_sug.to_csv(SUGGEST_PATH, index=False)
+
+
 df = load_data()
+suggestions_df = load_suggestions()
 
 # --------------------------
-# HEADER + LOGO
+# 2. HEADER + LOGO
 # --------------------------
 logo_col, title_col = st.columns([1, 4])
 
@@ -127,9 +143,9 @@ with title_col:
 st.divider()
 
 # --------------------------
-# TABS
+# 3. TABS
 # --------------------------
-tab_dir, tab_about, tab_koreksi = st.tabs(
+tab_dir, tab_about, tab_admin = st.tabs(
     ["📊 Direktori", "ℹ️ Tentang", "✏️ Koreksi Data & Admin"]
 )
 
@@ -142,7 +158,7 @@ with tab_dir:
     fcol1, fcol2 = st.columns([1, 3])
 
     with fcol1:
-        st.markdown("#### 🔍 Filter")
+        st.markdown("#### 🔎 Filter")
         name = st.text_input("Cari Nama Organisasi")
         addr = st.text_input("Cari Alamat / Daerah")
 
@@ -171,7 +187,9 @@ with tab_dir:
     filtered_count = len(filtered)
 
     with fcol2:
-        st.markdown(f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga")
+        st.markdown(
+            f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
+        )
 
         cols = [c for c in [
             "No",
@@ -189,6 +207,11 @@ with tab_dir:
                 show_df[col] = show_df[col].fillna("").astype(str).str.slice(0, 140) + "…"
 
         st.dataframe(show_df, use_container_width=True)
+
+    st.info(
+        "Untuk mengusulkan koreksi data lembaga, silakan buka tab "
+        "**✏️ Koreksi Data & Admin**."
+    )
 
 # ==========================
 # TAB 2: TENTANG
@@ -215,39 +238,137 @@ with tab_about:
 # ==========================
 # TAB 3: KOREKSI DATA & ADMIN
 # ==========================
-with tab_koreksi:
+with tab_admin:
     st.subheader("✏️ Ajukan Koreksi Data Lembaga")
 
     st.markdown(
         """
         Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
-        silakan mengisi formulir koreksi di bawah ini.
+        silakan mengisi form di bawah ini.
         
-        Usulan Anda akan otomatis tercatat di Google Sheets (Responses),
-        lalu ditinjau oleh tim sebelum data utama di direktori diubah.
+        Usulan akan muncul di tabel di bawah (status **Pending**) dan
+        dapat di-approve / reject oleh admin. Perubahan ke file utama
+        tetap dilakukan manual supaya aman.
         """
     )
 
-    if GOOGLE_FORM_EMBED_URL.startswith("https://docs.google.com"):
-        st.components.v1.iframe(
-            GOOGLE_FORM_EMBED_URL,
-            height=700,
+    # ---------- FORM INPUT KOREKSI ----------
+    with st.form("suggest_form"):
+        org_name = st.selectbox(
+            "Pilih lembaga yang ingin dikoreksi",
+            sorted(df["Nama Organisasi"].dropna().unique()),
         )
-    else:
-        st.warning("Google Form belum dikonfigurasi. Hubungi admin untuk menambahkan URL.")
+        pengaju = st.text_input("Nama Anda")
+        kontak = st.text_input("Kontak (email / WA)")
+        kolom = st.multiselect(
+            "Bagian yang ingin diubah",
+            [
+                "Alamat Organisasi",
+                "Kontak Lembaga/Layanan",
+                "Email Lembaga",
+                "Layanan Yang Diberikan",
+                "Profil Organisasi",
+                "Lainnya",
+            ],
+        )
+        usulan = st.text_area(
+            "Tuliskan data baru / koreksi yang diusulkan",
+            height=150,
+        )
+
+        submitted = st.form_submit_button("Kirim Usulan Koreksi")
+
+        if submitted:
+            if not usulan.strip():
+                st.warning("Mohon isi data koreksi terlebih dahulu.")
+            else:
+                suggestions_df = load_suggestions()
+                new_id = (
+                    suggestions_df["id"].max() + 1
+                    if not suggestions_df.empty else 1
+                )
+                new_row = {
+                    "id": int(new_id),
+                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                    "organisasi": org_name,
+                    "pengaju": pengaju,
+                    "kontak": kontak,
+                    "kolom": "; ".join(kolom) if kolom else "",
+                    "usulan": usulan.strip(),
+                    "status": "Pending",
+                    "processed_at": "",
+                }
+                suggestions_df = pd.concat(
+                    [suggestions_df, pd.DataFrame([new_row])],
+                    ignore_index=True,
+                )
+                save_suggestions(suggestions_df)
+                st.success(
+                    "Terima kasih, usulan koreksi Anda sudah tercatat. "
+                    "Admin dapat melihatnya di tabel di bawah."
+                )
 
     st.markdown("---")
-    st.subheader("📥 Panduan untuk Admin")
+    st.subheader("📥 Panel Admin – Review & Approval")
 
-    st.markdown(
-        """
-        1. Buka Google Sheet yang terhubung dengan Google Form *Koreksi Data*.
-        2. Tinjau setiap respon:
-           - cocokkan dengan data di direktori,
-           - klarifikasi ke lembaga jika perlu.
-        3. Jika disetujui:
-           - update file `fpl database.csv` di komputer Anda,
-           - commit & push ke GitHub (`publicdashboard` repo),
-           - dashboard akan otomatis menggunakan data terbaru.
-        """
-    )
+    suggestions_df = load_suggestions()
+
+    if suggestions_df.empty:
+        st.caption("Belum ada usulan koreksi yang tercatat.")
+    else:
+        # urutkan paling baru di atas
+        suggestions_df = suggestions_df.sort_values(
+            "timestamp", ascending=False
+        ).reset_index(drop=True)
+
+        # tampilkan per baris dengan tombol Approve / Reject
+        for idx, row in suggestions_df.iterrows():
+            box = st.expander(
+                f"[{row['status']}] {row['organisasi']} "
+                f"(oleh {row['pengaju'] or '—'})",
+                expanded=(row["status"] == "Pending"),
+            )
+            with box:
+                st.write(f"**Waktu**: {row['timestamp']}")
+                st.write(f"**Kontak**: {row['kontak'] or '—'}")
+                st.write(f"**Bagian dikoreksi**: {row['kolom'] or '—'}")
+                st.write("**Usulan:**")
+                st.write(row["usulan"])
+
+                col_a, col_b, col_c = st.columns([1, 1, 3])
+                current_status = row["status"]
+
+                if col_a.button(
+                    "✅ Approve",
+                    key=f"approve_{int(row['id'])}",
+                    use_container_width=True,
+                ):
+                    suggestions_df.loc[idx, "status"] = "Approved"
+                    suggestions_df.loc[idx, "processed_at"] = (
+                        datetime.datetime.utcnow().isoformat()
+                    )
+                    save_suggestions(suggestions_df)
+                    st.experimental_rerun()
+
+                if col_b.button(
+                    "❌ Reject",
+                    key=f"reject_{int(row['id'])}",
+                    use_container_width=True,
+                ):
+                    suggestions_df.loc[idx, "status"] = "Rejected"
+                    suggestions_df.loc[idx, "processed_at"] = (
+                        datetime.datetime.utcnow().isoformat()
+                    )
+                    save_suggestions(suggestions_df)
+                    st.experimental_rerun()
+
+                col_c.write(f"Status sekarang: **{current_status}**")
+
+        # Tombol download semua koreksi
+        csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download semua usulan (CSV) untuk diolah offline",
+            data=csv_data,
+            file_name="edit_suggestions_fpl.csv",
+            mime="text/csv",
+        )
