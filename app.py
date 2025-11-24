@@ -212,7 +212,7 @@ if "detail_org" not in st.session_state:
 # --------------------------
 st.divider()
 st.divider()
-logo_col, title_col = st.columns([3, 4])
+logo_col, title_col = st.columns([1, 2])
 
 with logo_col:
     if FPL_LOGO_PATH.exists():
