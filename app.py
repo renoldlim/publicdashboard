@@ -191,22 +191,42 @@ with tab_dir:
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
         )
 
-        cols = [c for c in [
-            "No",
-            "Nama Organisasi",
-            "Alamat Organisasi",
-            "Kontak Lembaga/Layanan",
-            "Email Lembaga",
-            "Layanan Yang Diberikan",
-            "kategori_layanan",
-        ] if c in filtered.columns]
+# Pilih hanya kolom yang akan ditampilkan
+cols = [c for c in [
+    "Nama Organisasi",
+    "Alamat Organisasi",
+    "Kontak Lembaga/Layanan",
+    "Email Lembaga",
+    "kategori_layanan",
+] if c in filtered.columns]
 
-        show_df = filtered[cols].copy()
-        for col in ["Alamat Organisasi", "Layanan Yang Diberikan"]:
-            if col in show_df.columns:
-                show_df[col] = show_df[col].fillna("").astype(str).str.slice(0, 140) + "…"
+show_df = filtered[cols].copy()
 
-        st.dataframe(show_df, use_container_width=True)
+# Ubah list kategori_layanan menjadi teks yang enak dibaca
+if "kategori_layanan" in show_df.columns:
+    show_df["kategori_layanan"] = show_df["kategori_layanan"].apply(
+        lambda x: ", ".join(x) if isinstance(x, (list, tuple)) else str(x)
+    )
+
+# (Opsional) pendekkan alamat kalau mau, supaya tabel tidak terlalu lebar
+if "Alamat Organisasi" in show_df.columns:
+    show_df["Alamat Organisasi"] = (
+        show_df["Alamat Organisasi"]
+        .fillna("")
+        .astype(str)
+        .str.slice(0, 160) + "…"
+    )
+
+# Rename header ke gaya internasional
+show_df = show_df.rename(columns={
+    "Nama Organisasi": "Organisation Name",
+    "Alamat Organisasi": "Address",
+    "Kontak Lembaga/Layanan": "Service Contact",
+    "Email Lembaga": "Service Email",
+    "kategori_layanan": "Service Categories",
+})
+
+st.dataframe(show_df, use_container_width=True)
 
     st.info(
         "Untuk mengusulkan koreksi data lembaga, silakan buka tab "
