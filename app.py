@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import datetime
 import re
+import math
 
 # --------------------------
 # CONFIG & CONSTANTS
@@ -16,6 +17,21 @@ st.set_page_config(
 DATA_PATH = Path(__file__).parent / "fpl database.csv"
 FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"  # optional
 SUGGEST_PATH = Path(__file__).parent / "edit_suggestions.csv"
+
+# --------------------------
+# HELPER: SAFE STRING
+# --------------------------
+def safe_str(val) -> str:
+    """Konversi nilai apa pun (termasuk NaN/float/None) ke string aman."""
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    return str(val).strip()
+
 
 # CSS: layout, tabs, card & tag
 st.markdown(
@@ -181,42 +197,6 @@ def save_suggestions(df_sug: pd.DataFrame):
 df = load_data()
 
 # --------------------------
-# 2. SIMPLE "LLM-LIKE" SEARCH ENGINE
-# --------------------------
-def search_directory(df: pd.DataFrame, question: str, top_k: int = 5):
-    """
-    Pencarian sederhana berbasis keyword: hitung berapa banyak token
-    pertanyaan muncul di setiap lembaga.
-    """
-    q = question.lower()
-    tokens = [t for t in re.split(r"\W+", q) if len(t) >= 3]
-    if not tokens:
-        return pd.DataFrame()
-
-    scores = []
-    for idx, row in df.iterrows():
-        parts = [
-            str(row.get("Nama Organisasi", "")),
-            str(row.get("Alamat Organisasi", "")),
-            " ".join(row.get("kategori_layanan", []))
-            if isinstance(row.get("kategori_layanan"), (list, tuple))
-            else str(row.get("kategori_layanan", "")),
-            str(row.get("Layanan Yang Diberikan", "")),
-        ]
-        doc = " ".join(parts).lower()
-        score = sum(doc.count(tok) for tok in tokens)
-        if score > 0:
-            scores.append((score, idx))
-
-    scores.sort(reverse=True)
-    if not scores:
-        return pd.DataFrame()
-
-    best_indices = [idx for _, idx in scores[:top_k]]
-    return df.loc[best_indices].copy()
-
-
-# --------------------------
 # 3. HEADER + LOGO
 # --------------------------
 logo_col, title_col = st.columns([1, 4])
@@ -244,7 +224,7 @@ tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
 )
 
 # ==========================
-# TAB 1: DIREKTORI (CARD VIEW + "LLM")
+# TAB 1: DIREKTORI (CARD VIEW + PAGINATION + TABLE)
 # ==========================
 with tab_dir:
     st.subheader("📊 Direktori Layanan")
@@ -261,7 +241,7 @@ with tab_dir:
         selected_categories = st.multiselect("Kategori Layanan", all_categories)
 
         if st.button("Reset filter"):
-            st.experimental_rerun()
+            st.rerun()
 
     filtered = df.copy()
 
@@ -286,69 +266,47 @@ with tab_dir:
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
         )
 
-        # ---- LLM-like Q&A section ----
-        st.markdown("#### 🤖 Tanya Direktori (Knowledge Search)")
-
-        qa_question = st.text_area(
-            "Tulis pertanyaan Anda (contoh: *“Lembaga yang punya shelter aman di Jakarta”*):",
-            height=80,
-        )
-        if st.button("Cari jawaban", key="qa_button"):
-            if not qa_question.strip():
-                st.warning("Silakan tulis pertanyaan terlebih dahulu.")
-            else:
-                results = search_directory(df, qa_question, top_k=5)
-                if results.empty:
-                    st.info(
-                        "Belum menemukan lembaga yang cocok dengan pertanyaan tersebut. "
-                        "Coba gunakan kata kunci wilayah atau jenis layanan."
-                    )
-                else:
-                    st.write(
-                        f"Aku menemukan **{len(results)}** lembaga yang paling relevan:"
-                    )
-                    for _, row in results.iterrows():
-                        nama = row.get("Nama Organisasi", "").strip()
-                        alamat = row.get("Alamat Organisasi", "").strip()
-                        kategori = row.get("kategori_layanan", [])
-                        if isinstance(kategori, str):
-                            kategori_list = [
-                                k.strip() for k in kategori.split(",") if k.strip()
-                            ]
-                        else:
-                            kategori_list = kategori or []
-
-                        kat_str = ", ".join(kategori_list) if kategori_list else "tidak tercantum"
-
-                        if len(alamat) > 180:
-                            alamat_disp = alamat[:180] + "…"
-                        else:
-                            alamat_disp = alamat
-
-                        st.markdown(
-                            f"- **{nama}** – {kat_str}\n"
-                            f"  \n  _{alamat_disp}_"
-                        )
-
         st.markdown("---")
 
-        # ---- Card view for filtered results ----
         if filtered_count == 0:
             st.info("Belum ada lembaga yang cocok dengan filter.")
         else:
+            # ---------- PAGINATION ----------
             cards_df = filtered.reset_index(drop=True)
-            n_cols = 2 if len(cards_df) > 1 else 1
+            page_size = 10
+            total_pages = max(1, math.ceil(len(cards_df) / page_size))
 
-            for i in range(0, len(cards_df), n_cols):
+            col_page, col_info = st.columns([1, 3])
+            with col_page:
+                page = st.number_input(
+                    "Halaman",
+                    min_value=1,
+                    max_value=total_pages,
+                    value=1,
+                    step=1,
+                )
+
+            with col_info:
+                st.caption(f"Menampilkan lembaga nomor {(page-1)*page_size+1}–"
+                           f"{min(page*page_size, len(cards_df))} dari {len(cards_df)} hasil.")
+
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            page_df = cards_df.iloc[start_idx:end_idx]
+
+            # ---------- CARD VIEW (10 per page) ----------
+            n_cols = 2 if len(page_df) > 1 else 1
+
+            for i in range(0, len(page_df), n_cols):
                 cols = st.columns(n_cols)
-                chunk = cards_df.iloc[i:i + n_cols]
+                chunk = page_df.iloc[i:i + n_cols]
 
                 for col, (_, row) in zip(cols, chunk.iterrows()):
                     with col:
-                        nama = row.get("Nama Organisasi", "").strip()
-                        alamat = row.get("Alamat Organisasi", "").strip()
-                        kontak = row.get("Kontak Lembaga/Layanan", "").strip()
-                        email = row.get("Email Lembaga", "").strip()
+                        nama = safe_str(row.get("Nama Organisasi", ""))
+                        alamat = safe_str(row.get("Alamat Organisasi", ""))
+                        kontak = safe_str(row.get("Kontak Lembaga/Layanan", ""))
+                        email = safe_str(row.get("Email Lembaga", ""))
                         kategori = row.get("kategori_layanan", [])
 
                         if isinstance(kategori, str):
@@ -384,6 +342,49 @@ with tab_dir:
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
+
+            # ---------- EXPANDER: FULL TABLE + DOWNLOAD ----------
+            with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
+                table_df = filtered.copy()
+
+                cols = [c for c in [
+                    "Nama Organisasi",
+                    "Alamat Organisasi",
+                    "Kontak Lembaga/Layanan",
+                    "Email Lembaga",
+                    "kategori_layanan",
+                ] if c in table_df.columns]
+
+                table_df = table_df[cols].copy()
+
+                if "kategori_layanan" in table_df.columns:
+                    def cat_to_text(x):
+                        if isinstance(x, (list, tuple)):
+                            return ", ".join(x)
+                        return safe_str(x)
+                    table_df["kategori_layanan"] = table_df["kategori_layanan"].apply(cat_to_text)
+
+                # Rename header ke gaya internasional
+                table_df = table_df.rename(columns={
+                    "Nama Organisasi": "Organisation Name",
+                    "Alamat Organisasi": "Address",
+                    "Kontak Lembaga/Layanan": "Service Contact",
+                    "Email Lembaga": "Service Email",
+                    "kategori_layanan": "Service Categories",
+                })
+
+                # Tambah nomor urut
+                table_df.insert(0, "No", range(1, len(table_df) + 1))
+
+                st.dataframe(table_df, use_container_width=True)
+
+                csv_data = table_df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "⬇️ Download filtered results (CSV)",
+                    data=csv_data,
+                    file_name="fpl_directory_filtered.csv",
+                    mime="text/csv",
+                )
 
 # ==========================
 # TAB 2: KOREKSI DATA (FORM + COUNT)
@@ -443,7 +444,7 @@ with tab_koreksi:
 
                 new_row = {
                     "id": int(new_id),
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "organisasi": org_name,
                     "pengaju": pengaju,
                     "kontak": kontak,
@@ -490,19 +491,19 @@ with tab_admin:
             st.metric("Usulan Pending", pending_count)
 
             for idx, row in suggestions_df.iterrows():
-                status = row.get("status", "Pending")
-                org = row.get("organisasi", "")
-                pengaju = row.get("pengaju", "") or "—"
+                status = safe_str(row.get("status", "Pending"))
+                org = safe_str(row.get("organisasi", ""))
+                pengaju = safe_str(row.get("pengaju", "")) or "—"
 
                 title = f"[{status}] {org} (oleh {pengaju})"
 
                 box = st.expander(title, expanded=(status == "Pending"))
                 with box:
-                    st.write(f"**Waktu pengajuan**: {row.get('timestamp', '')}")
-                    st.write(f"**Kontak pengaju**: {row.get('kontak', '') or '—'}")
-                    st.write(f"**Bagian yang dikoreksi**: {row.get('kolom', '') or '—'}")
+                    st.write(f"**Waktu pengajuan**: {safe_str(row.get('timestamp', ''))}")
+                    st.write(f"**Kontak pengaju**: {safe_str(row.get('kontak', '')) or '—'}")
+                    st.write(f"**Bagian yang dikoreksi**: {safe_str(row.get('kolom', '')) or '—'}")
                     st.write("**Usulan koreksi:**")
-                    st.write(row.get("usulan", ""))
+                    st.write(safe_str(row.get("usulan", "")))
 
                     col_a, col_b, col_c = st.columns([1, 1, 3])
                     current_status = status
@@ -514,10 +515,10 @@ with tab_admin:
                     ):
                         suggestions_df.loc[idx, "status"] = "Approved"
                         suggestions_df.loc[idx, "processed_at"] = (
-                            datetime.datetime.utcnow().isoformat()
+                            datetime.datetime.now(datetime.timezone.utc).isoformat()
                         )
                         save_suggestions(suggestions_df)
-                        st.experimental_rerun()
+                        st.rerun()
 
                     if col_b.button(
                         "❌ Reject",
@@ -526,10 +527,10 @@ with tab_admin:
                     ):
                         suggestions_df.loc[idx, "status"] = "Rejected"
                         suggestions_df.loc[idx, "processed_at"] = (
-                            datetime.datetime.utcnow().isoformat()
+                            datetime.datetime.now(datetime.timezone.utc).isoformat()
                         )
                         save_suggestions(suggestions_df)
-                        st.experimental_rerun()
+                        st.rerun()
 
                     col_c.write(f"Status sekarang: **{current_status}**")
 
