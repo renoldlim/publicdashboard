@@ -184,7 +184,7 @@ cols = [c for c in [
     "Alamat Organisasi",
     "Kontak Lembaga/Layanan",
     "Email Lembaga",
-    "Layanan Yang Diberikan",
+  
     "kategori_layanan",
 ] if c in filtered.columns]
 
