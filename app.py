@@ -34,6 +34,10 @@ st.markdown(
     .sidebar-content {
         padding-top: 1rem;
     }
+    /* Tambah jarak di dalam panel tab, supaya judul tidak nempel & kepotong */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
