@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 DATA_PATH = Path(__file__).parent / "fpl database.csv"
-FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"
+FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"  # optional
 SUGGEST_PATH = Path(__file__).parent / "edit_suggestions.csv"
 
 # CSS: rapikan layout + turunkan isi tab sedikit
@@ -36,8 +36,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 # --------------------------
-# 1. LOAD & PREPARE DATA UTAMA
+# 1. LOAD & PREPARE MAIN DATA
 # --------------------------
 @st.cache_data
 def load_data():
@@ -96,31 +97,51 @@ def load_data():
 
 
 def load_suggestions():
-    """Selalu baca file koreksi terbaru (tanpa cache)."""
+    """Baca file koreksi dan pastikan semua kolom yang dibutuhkan ada."""
+    required_cols = [
+        "id",
+        "timestamp",
+        "organisasi",
+        "pengaju",
+        "kontak",
+        "kolom",
+        "usulan",
+        "status",
+        "processed_at",
+    ]
+
     if SUGGEST_PATH.exists():
-        return pd.read_csv(SUGGEST_PATH)
+        df = pd.read_csv(SUGGEST_PATH)
+
+        # Tambah kolom yang belum ada
+        if "id" not in df.columns:
+            df["id"] = range(1, len(df) + 1)
+        if "status" not in df.columns:
+            df["status"] = "Pending"
+        if "processed_at" not in df.columns:
+            df["processed_at"] = ""
+
+        for c in required_cols:
+            if c not in df.columns:
+                df[c] = ""
+
+        # pastikan id numerik
+        df["id"] = pd.to_numeric(df["id"], errors="coerce")
+        if df["id"].isna().any():
+            df["id"] = range(1, len(df) + 1)
+
+        return df[required_cols]
     else:
-        return pd.DataFrame(
-            columns=[
-                "id",
-                "timestamp",
-                "organisasi",
-                "pengaju",
-                "kontak",
-                "kolom",
-                "usulan",
-                "status",
-                "processed_at",
-            ]
-        )
+        return pd.DataFrame(columns=required_cols)
 
 
-def save_suggestions(df_sug):
+def save_suggestions(df_sug: pd.DataFrame):
     df_sug.to_csv(SUGGEST_PATH, index=False)
 
 
 df = load_data()
 suggestions_df = load_suggestions()
+
 
 # --------------------------
 # 2. HEADER + LOGO
@@ -141,6 +162,7 @@ with title_col:
     )
 
 st.divider()
+
 
 # --------------------------
 # 3. TABS
@@ -191,47 +213,51 @@ with tab_dir:
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
         )
 
-# Pilih hanya kolom yang akan ditampilkan
-cols = [c for c in [
-    "Nama Organisasi",
-    "Alamat Organisasi",
-    "Kontak Lembaga/Layanan",
-    "Email Lembaga",
-    "kategori_layanan",
-] if c in filtered.columns]
+        # Kolom yang ditampilkan (tanpa "Layanan Yang Diberikan")
+        cols = [c for c in [
+            "Nama Organisasi",
+            "Alamat Organisasi",
+            "Kontak Lembaga/Layanan",
+            "Email Lembaga",
+            "kategori_layanan",
+        ] if c in filtered.columns]
 
-show_df = filtered[cols].copy()
+        show_df = filtered[cols].copy()
 
-# Ubah list kategori_layanan menjadi teks yang enak dibaca
-if "kategori_layanan" in show_df.columns:
-    show_df["kategori_layanan"] = show_df["kategori_layanan"].apply(
-        lambda x: ", ".join(x) if isinstance(x, (list, tuple)) else str(x)
-    )
+        # Ubah list kategori_layanan jadi teks
+        if "kategori_layanan" in show_df.columns:
+            show_df["kategori_layanan"] = show_df["kategori_layanan"].apply(
+                lambda x: ", ".join(x) if isinstance(x, (list, tuple)) else str(x)
+            )
 
-# (Opsional) pendekkan alamat kalau mau, supaya tabel tidak terlalu lebar
-if "Alamat Organisasi" in show_df.columns:
-    show_df["Alamat Organisasi"] = (
-        show_df["Alamat Organisasi"]
-        .fillna("")
-        .astype(str)
-        .str.slice(0, 160) + "…"
-    )
+        # Pendekkan alamat supaya tabel tidak terlalu lebar
+        if "Alamat Organisasi" in show_df.columns:
+            show_df["Alamat Organisasi"] = (
+                show_df["Alamat Organisasi"]
+                .fillna("")
+                .astype(str)
+                .str.slice(0, 160) + "…"
+            )
 
-# Rename header ke gaya internasional
-show_df = show_df.rename(columns={
-    "Nama Organisasi": "Organisation Name",
-    "Alamat Organisasi": "Address",
-    "Kontak Lembaga/Layanan": "Service Contact",
-    "Email Lembaga": "Service Email",
-    "kategori_layanan": "Service Categories",
-})
+        # Rename header ke gaya internasional
+        show_df = show_df.rename(columns={
+            "Nama Organisasi": "Organisation Name",
+            "Alamat Organisasi": "Address",
+            "Kontak Lembaga/Layanan": "Service Contact",
+            "Email Lembaga": "Service Email",
+            "kategori_layanan": "Service Categories",
+        })
 
-st.dataframe(show_df, use_container_width=True)
+        # Tambah nomor urut
+        show_df.insert(0, "No", range(1, len(show_df) + 1))
+
+        st.dataframe(show_df, use_container_width=True)
 
     st.info(
         "Untuk mengusulkan koreksi data lembaga, silakan buka tab "
         "**✏️ Koreksi Data & Admin**."
     )
+
 
 # ==========================
 # TAB 2: TENTANG
@@ -255,6 +281,7 @@ with tab_about:
         """
     )
 
+
 # ==========================
 # TAB 3: KOREKSI DATA & ADMIN
 # ==========================
@@ -265,8 +292,8 @@ with tab_admin:
         """
         Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
         silakan mengisi form di bawah ini.
-        
-        Usulan akan muncul di tabel di bawah (status **Pending**) dan
+
+        Usulan akan muncul di tabel di bagian bawah (status **Pending**) dan
         dapat di-approve / reject oleh admin. Perubahan ke file utama
         tetap dilakukan manual supaya aman.
         """
@@ -303,10 +330,11 @@ with tab_admin:
                 st.warning("Mohon isi data koreksi terlebih dahulu.")
             else:
                 suggestions_df = load_suggestions()
-                new_id = (
-                    suggestions_df["id"].max() + 1
-                    if not suggestions_df.empty else 1
-                )
+                if suggestions_df.empty:
+                    new_id = 1
+                else:
+                    new_id = int(suggestions_df["id"].max()) + 1
+
                 new_row = {
                     "id": int(new_id),
                     "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -343,16 +371,16 @@ with tab_admin:
 
         # tampilkan per baris dengan tombol Approve / Reject
         for idx, row in suggestions_df.iterrows():
-            box = st.expander(
-                f"[{row['status']}] {row['organisasi']} "
-                f"(oleh {row['pengaju'] or '—'})",
-                expanded=(row["status"] == "Pending"),
-            )
+            title = f"[{row['status']}] {row['organisasi']} "
+            if row["pengaju"]:
+                title += f"(oleh {row['pengaju']})"
+
+            box = st.expander(title, expanded=(row["status"] == "Pending"))
             with box:
-                st.write(f"**Waktu**: {row['timestamp']}")
-                st.write(f"**Kontak**: {row['kontak'] or '—'}")
-                st.write(f"**Bagian dikoreksi**: {row['kolom'] or '—'}")
-                st.write("**Usulan:**")
+                st.write(f"**Waktu pengajuan**: {row['timestamp']}")
+                st.write(f"**Kontak pengaju**: {row['kontak'] or '—'}")
+                st.write(f"**Bagian yang dikoreksi**: {row['kolom'] or '—'}")
+                st.write("**Usulan koreksi:**")
                 st.write(row["usulan"])
 
                 col_a, col_b, col_c = st.columns([1, 1, 3])
