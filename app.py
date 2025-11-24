@@ -1,19 +1,22 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-import datetime
-
-import gspread
-from google.oauth2.service_account import Credentials
 
 # --------------------------
-# 0. PAGE CONFIG & STYLE
+# CONFIG & CONSTANTS
 # --------------------------
 st.set_page_config(
     page_title="Direktori Layanan FPL",
     page_icon="📚",
     layout="wide",
 )
+
+DATA_PATH = Path(__file__).parent / "fpl database.csv"
+FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"
+
+# Ganti dengan URL Google Form kamu (versi embed)
+# Contoh: "https://docs.google.com/forms/d/e/XXX/viewform?embedded=true"
+GOOGLE_FORM_EMBED_URL = "https://docs.google.com/forms/d/XXXXX/viewform?embedded=true"
 
 st.markdown(
     """
@@ -31,31 +34,8 @@ st.markdown(
 )
 
 # --------------------------
-# 1. KONFIG & DATA UTAMA
+# LOAD & PREPARE DATA
 # --------------------------
-DATA_PATH = Path(__file__).parent / "fpl database.csv"
-
-# ID Google Sheet untuk usulan koreksi (set di Streamlit secrets)
-SUGGEST_SHEET_ID = st.secrets.get("SUGGEST_SHEET_ID", None)
-SUGGEST_SHEET_NAME = "Koreksi"  # nama tab di Google Sheet
-
-
-# ---------- Google Sheets client ----------
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-
-@st.cache_resource
-def get_gsheet_client():
-    """Inisialisasi client gspread dari secrets Streamlit."""
-    creds_info = st.secrets["gcp_service_account"]
-    creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-    client = gspread.authorize(creds)
-    return client
-
-
 @st.cache_data
 def load_data():
     df = pd.read_csv(DATA_PATH, sep=";", engine="python")
@@ -74,7 +54,7 @@ def load_data():
     else:
         df["layanan_list"] = [[] for _ in range(len(df))]
 
-    # mapping layanan ke kategori pendek
+    # mapping ke kategori
     def classify_service(s: str):
         s_low = s.lower()
         cats = set()
@@ -112,37 +92,18 @@ def load_data():
     return df
 
 
-@st.cache_data
-def load_suggestions_from_sheet():
-    """Baca semua usulan koreksi dari Google Sheet (tab Koreksi)."""
-    if not SUGGEST_SHEET_ID:
-        return None
-
-    client = get_gsheet_client()
-    sh = client.open_by_key(SUGGEST_SHEET_ID)
-    ws = sh.worksheet(SUGGEST_SHEET_NAME)
-    records = ws.get_all_records()
-    if not records:
-        return pd.DataFrame(
-            columns=["timestamp", "organisasi", "pengaju", "kontak", "kolom", "usulan"]
-        )
-    return pd.DataFrame(records)
-
-
 df = load_data()
-suggestions_df = load_suggestions_from_sheet()
 
 # --------------------------
-# 2. HEADER + LOGO
+# HEADER + LOGO
 # --------------------------
 logo_col, title_col = st.columns([1, 4])
 
 with logo_col:
-    logo_path = Path(__file__).parent / "fpl_logo.png"
-    if logo_path.exists():
-        st.image(logo_path, width=90)
+    if FPL_LOGO_PATH.exists():
+        st.image(FPL_LOGO_PATH, width=90)
     else:
-        st.markdown("📚")  # fallback emoji
+        st.markdown("📚")
 
 with title_col:
     st.markdown("### Direktori Layanan FPL")
@@ -154,19 +115,18 @@ with title_col:
 st.divider()
 
 # --------------------------
-# 3. TABS
+# TABS
 # --------------------------
-tab_dir, tab_about, tab_help = st.tabs(
-    ["📊 DirektorI", "ℹ️ Tentang Direktori", "✏️ Panduan Koreksi & Admin"]
+tab_dir, tab_about, tab_koreksi = st.tabs(
+    ["📊 Direktori", "ℹ️ Tentang", "✏️ Koreksi Data & Admin"]
 )
 
-# --------------------------
-# TAB 1: DIREKTORI (FILTER + TABEL + FORM KOREKSI)
-# --------------------------
+# ==========================
+# TAB 1: DIREKTORI
+# ==========================
 with tab_dir:
     st.subheader("📊 Direktori Layanan")
 
-    # FILTER di kolom kiri
     fcol1, fcol2 = st.columns([1, 3])
 
     with fcol1:
@@ -178,12 +138,8 @@ with tab_dir:
         selected_categories = st.multiselect("Kategori Layanan", all_categories)
 
         if st.button("Reset filter"):
-            name = ""
-            addr = ""
-            selected_categories = []
             st.experimental_rerun()
 
-    # FILTERING
     filtered = df.copy()
 
     if name:
@@ -222,154 +178,64 @@ with tab_dir:
 
         st.dataframe(show_df, use_container_width=True)
 
-    st.markdown("#### ✏️ Ajukan Koreksi Data")
-
-    st.markdown(
-        "Jika Anda pengelola lembaga dan menemukan data yang tidak tepat, "
-        "silakan ajukan koreksi melalui form berikut."
-    )
-
-    with st.form("suggest_form"):
-        org_name = st.selectbox(
-            "Pilih lembaga yang ingin dikoreksi",
-            sorted(df["Nama Organisasi"].dropna().unique()),
-        )
-        pengaju = st.text_input("Nama Anda")
-        kontak = st.text_input("Kontak (email / WA)")
-        kolom = st.multiselect(
-            "Bagian yang ingin diubah",
-            [
-                "Alamat Organisasi",
-                "Kontak Lembaga/Layanan",
-                "Email Lembaga",
-                "Layanan Yang Diberikan",
-                "Profil Organisasi",
-                "Lainnya",
-            ],
-        )
-        usulan = st.text_area(
-            "Tuliskan data baru / koreksi yang diusulkan",
-            height=150,
-        )
-
-        submitted = st.form_submit_button("Kirim Usulan Koreksi")
-
-        if submitted:
-            if not usulan.strip():
-                st.warning("Mohon isi data koreksi terlebih dahulu.")
-            elif not SUGGEST_SHEET_ID:
-                st.error(
-                    "Google Sheet untuk koreksi belum dikonfigurasi. "
-                    "Silakan hubungi admin."
-                )
-            else:
-                try:
-                    client = get_gsheet_client()
-                    sh = client.open_by_key(SUGGEST_SHEET_ID)
-                    # pastikan tab 'Koreksi' sudah ada
-                    try:
-                        ws = sh.worksheet(SUGGEST_SHEET_NAME)
-                    except gspread.WorksheetNotFound:
-                        ws = sh.add_worksheet(
-                            title=SUGGEST_SHEET_NAME, rows=1000, cols=10
-                        )
-                        ws.append_row(
-                            ["timestamp", "organisasi", "pengaju",
-                             "kontak", "kolom", "usulan"]
-                        )
-
-                    new_row = [
-                        datetime.datetime.utcnow().isoformat(),
-                        org_name,
-                        pengaju,
-                        kontak,
-                        "; ".join(kolom) if kolom else "",
-                        usulan.strip(),
-                    ]
-                    ws.append_row(new_row)
-                    load_suggestions_from_sheet.clear()  # refresh cache
-                    st.success(
-                        "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                        "Tim akan memverifikasi sebelum mengubah data utama."
-                    )
-                except Exception as e:
-                    st.error(f"Gagal menyimpan ke Google Sheet: {e}")
-
-# --------------------------
-# TAB 2: TENTANG DIREKTORI
-# --------------------------
+# ==========================
+# TAB 2: TENTANG
+# ==========================
 with tab_about:
     st.subheader("ℹ️ Tentang Direktori Layanan FPL")
-
     st.markdown(
         """
-        Direktori ini dikembangkan untuk memudahkan:
+        Direktori ini disusun untuk membantu:
 
-        - Penyintas kekerasan dan pendamping mencari **lembaga layanan terdekat**
-          yang relevan dengan kebutuhan mereka.
-        - Jaringan FPL dan mitra melihat **peta layanan** berdasarkan jenis layanan,
-          wilayah, dan profil lembaga.
+        - Penyintas kekerasan dan pendamping menemukan **lembaga layanan yang relevan dan terdekat**.
+        - Jaringan FPL dan mitra melihat **peta layanan** berdasarkan jenis layanan dan wilayah.
         
         **Sumber data:**
-        - Kompilasi lembaga anggota dan mitra FPL.
-        - Informasi kontak, alamat, dan layanan berasal dari pengisian formulir
-          dan proses verifikasi internal.
+        - Kompilasi lembaga anggota dan mitra Forum Pengada Layanan (FPL).
+        - Informasi dikumpulkan melalui formulir dan proses verifikasi internal.
         
-        Direktori ini akan diperbarui secara berkala berdasarkan:
-        - Usulan koreksi dari lembaga layanan.
+        Direktori akan diperbarui secara berkala berdasarkan:
+        - Usulan koreksi dari lembaga.
         - Hasil verifikasi lapangan dan koordinasi jaringan.
         """
     )
 
-# --------------------------
-# TAB 3: PANDUAN KOREKSI & ADMIN
-# --------------------------
-with tab_help:
-    st.subheader("✏️ Panduan Koreksi Data")
+# ==========================
+# TAB 3: KOREKSI DATA & ADMIN
+# ==========================
+with tab_koreksi:
+    st.subheader("✏️ Ajukan Koreksi Data Lembaga")
 
     st.markdown(
         """
-        **Bagi pengelola lembaga:**
-
-        1. Buka tab **Direktori**.
-        2. Cari lembaga Anda di tabel.
-        3. Scroll ke bagian **Ajukan Koreksi Data**.
-        4. Pilih nama lembaga, isi kontak, dan jelaskan koreksi yang diusulkan.
-        5. Tim admin akan:
-           - meninjau usulan,
-           - menghubungi Anda jika perlu klarifikasi,
-           - memperbarui direktori pada rilis berikutnya.
+        Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
+        silakan mengisi formulir koreksi di bawah ini.
+        
+        Usulan Anda akan otomatis tercatat di Google Sheets (Responses),
+        lalu ditinjau oleh tim sebelum data utama di direktori diubah.
         """
     )
 
-    st.markdown("---")
-    st.subheader("📥 Panel Admin (Ringkasan Usulan Koreksi)")
-
-    if not SUGGEST_SHEET_ID:
-        st.warning(
-            "Google Sheet untuk usulan koreksi belum dikonfigurasi "
-            "(`SUGGEST_SHEET_ID` di Streamlit secrets)."
+    if GOOGLE_FORM_EMBED_URL.startswith("https://docs.google.com"):
+        st.components.v1.iframe(
+            GOOGLE_FORM_EMBED_URL,
+            height=700,
         )
     else:
-        try:
-            suggestions_df = load_suggestions_from_sheet()
-            if suggestions_df is None or suggestions_df.empty:
-                st.caption("Belum ada usulan koreksi yang tercatat.")
-            else:
-                st.caption(
-                    "Daftar usulan koreksi dari lembaga. "
-                    "Gunakan untuk proses verifikasi dan pembaruan data."
-                )
-                st.dataframe(
-                    suggestions_df.sort_values("timestamp", ascending=False),
-                    use_container_width=True,
-                )
-                csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    "⬇️ Download usulan (CSV)",
-                    data=csv_data,
-                    file_name="koreksi_fpl.csv",
-                    mime="text/csv",
-                )
-        except Exception as e:
-            st.error(f"Gagal membaca Google Sheet: {e}")
+        st.warning("Google Form belum dikonfigurasi. Hubungi admin untuk menambahkan URL.")
+
+    st.markdown("---")
+    st.subheader("📥 Panduan untuk Admin")
+
+    st.markdown(
+        """
+        1. Buka Google Sheet yang terhubung dengan Google Form *Koreksi Data*.
+        2. Tinjau setiap respon:
+           - cocokkan dengan data di direktori,
+           - klarifikasi ke lembaga jika perlu.
+        3. Jika disetujui:
+           - update file `fpl database.csv` di komputer Anda,
+           - commit & push ke GitHub (`publicdashboard` repo),
+           - dashboard akan otomatis menggunakan data terbaru.
+        """
+    )
