@@ -36,9 +36,12 @@ def safe_str(val) -> str:
 st.markdown(
     """
     <style>
+    body {
+        background-color: #f9fafb;
+    }
     .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
+        padding-top: 1.5rem;
+        padding-bottom: 2.5rem;
     }
     .sidebar-content {
         padding-top: 1rem;
@@ -47,29 +50,34 @@ st.markdown(
     .stTabs [data-baseweb="tab-panel"] {
         padding-top: 1rem;
     }
+    /* judul section */
+    h3 {
+        margin-bottom: 0.4rem;
+    }
     /* card lembaga */
     .org-card {
-        padding: 0.75rem 1rem;
+        padding: 0.9rem 1.1rem;
         margin-bottom: 0.9rem;
-        border-radius: 0.85rem;
+        border-radius: 0.9rem;
         border: 1px solid #e5e7eb;
         background-color: #ffffff;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
     }
     .org-name {
         font-weight: 600;
         font-size: 1rem;
         margin-bottom: 0.15rem;
+        color: #111827;
     }
     .org-address {
-        font-size: 0.88rem;
+        font-size: 0.9rem;
         color: #4b5563;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.35rem;
     }
     .org-meta {
-        font-size: 0.85rem;
+        font-size: 0.86rem;
         color: #374151;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.15rem;
     }
     .org-meta span.label {
         font-weight: 600;
@@ -77,10 +85,10 @@ st.markdown(
     }
     .tag {
         display: inline-block;
-        padding: 0.15rem 0.55rem;
+        padding: 0.15rem 0.6rem;
         margin: 0 0.25rem 0.25rem 0;
         border-radius: 999px;
-        font-size: 0.75rem;
+        font-size: 0.76rem;
         background-color: #eef2ff;  /* indigo-50 */
         color: #3730a3;              /* indigo-800 */
         border: 1px solid #c7d2fe;   /* indigo-200 */
@@ -102,6 +110,12 @@ def load_data():
     df = df.rename(columns={
         "Kontak Lembaga/\nKontak Layanan": "Kontak Lembaga/Layanan",
     })
+
+    # pastikan kolom koordinat ada (untuk masa depan peta)
+    if "Latitude" not in df.columns:
+        df["Latitude"] = None
+    if "Longitude" not in df.columns:
+        df["Longitude"] = None
 
     # list layanan mentah
     if "Layanan Yang Diberikan" in df.columns:
@@ -160,6 +174,8 @@ def load_suggestions():
         "kontak",
         "kolom",
         "usulan",
+        "lat",
+        "lon",
         "status",
         "processed_at",
     ]
@@ -174,6 +190,10 @@ def load_suggestions():
             df["status"] = "Pending"
         if "processed_at" not in df.columns:
             df["processed_at"] = ""
+        if "lat" not in df.columns:
+            df["lat"] = ""
+        if "lon" not in df.columns:
+            df["lon"] = ""
 
         for c in required_cols:
             if c not in df.columns:
@@ -210,9 +230,7 @@ if "detail_org" not in st.session_state:
 # --------------------------
 # 3. HEADER + LOGO
 # --------------------------
-st.divider()
-st.divider()
-logo_col, title_col = st.columns([1, 2])
+logo_col, title_col = st.columns([1, 4])
 
 with logo_col:
     if FPL_LOGO_PATH.exists():
@@ -221,7 +239,7 @@ with logo_col:
         st.markdown("📚")
 
 with title_col:
-    st.markdown("### Direktori Layanan FPL")
+    st.markdown("<h2 style='margin-bottom:4px;'>Direktori Layanan FPL</h2>", unsafe_allow_html=True)
     st.markdown(
         "Direktori lembaga layanan yang bekerja untuk pemenuhan hak dan "
         "perlindungan korban kekerasan berbasis perempuan."
@@ -244,7 +262,7 @@ tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
 # TAB 1: DIREKTORI (CARD VIEW + PAGINATION + TABLE)
 # ==========================
 with tab_dir:
-    st.subheader("📊 Direktori Layanan")
+    st.markdown("### 📊 Direktori Layanan")
 
     fcol1, fcol2 = st.columns([1, 3])
 
@@ -257,7 +275,7 @@ with tab_dir:
         all_categories = sorted({c for cats in df["kategori_layanan"] for c in cats})
         selected_categories = st.multiselect("Kategori Layanan", all_categories)
 
-        if st.button("Reset filter"):
+        if st.button("Reset filter", use_container_width=True):
             name = ""
             addr = ""
             selected_categories = []
@@ -307,8 +325,8 @@ with tab_dir:
 
             with mid_col:
                 st.markdown(
-                    f"<div style='text-align:center;'>Halaman "
-                    f"<b>{st.session_state['page']}</b> / {total_pages}</div>",
+                    f"<div style='text-align:center; padding-top:4px;'>Halaman "
+                    f"<b>{st.session_state['page']}</b> dari {total_pages}</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -391,18 +409,19 @@ with tab_dir:
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
 
-                        bcol1, bcol2 = st.columns([1, 1])
+                        bcol1, bcol2 = st.columns(2)
                         with bcol1:
                             # Tombol kecil untuk usulkan koreksi
                             if st.button(
                                 "✏️ Usulkan koreksi",
                                 key=f"suggest_{start_idx + idx_row}",
+                                use_container_width=True,
                             ):
                                 st.session_state["koreksi_target_org"] = nama
                                 st.session_state["koreksi_hint"] = (
                                     f"Lembaga **{nama}** sudah otomatis dipilih "
                                     "di tab **Koreksi Data**. Silakan buka tab tersebut "
-                                    "untuk mengisi formulir koreksi."
+                                    "untuk mengisi formulir koreksi (termasuk koordinat lokasi bila ada)."
                                 )
                                 st.rerun()
                         with bcol2:
@@ -410,6 +429,7 @@ with tab_dir:
                             if st.button(
                                 "👁 Lihat detail",
                                 key=f"detail_{start_idx + idx_row}",
+                                use_container_width=True,
                             ):
                                 st.session_state["detail_org"] = nama
                                 st.rerun()
@@ -425,23 +445,41 @@ with tab_dir:
                     st.markdown("### 📄 Profil Lembaga")
                     st.markdown(f"**{safe_str(r.get('Nama Organisasi', ''))}**")
 
-                    st.markdown("**Alamat**")
-                    st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
+                    col_a, col_b = st.columns([2, 1])
 
-                    st.markdown("**Kontak Layanan**")
-                    st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
+                    with col_a:
+                        st.markdown("**Alamat**")
+                        st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
 
-                    st.markdown("**Email Layanan**")
-                    st.write(safe_str(r.get("Email Lembaga", "")) or "—")
+                        st.markdown("**Kontak Layanan**")
+                        st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
 
-                    # Website jika ada kolom
-                    if "Website" in r.index:
-                        st.markdown("**Website**")
-                        st.write(safe_str(r.get("Website", "")) or "—")
+                        st.markdown("**Email Layanan**")
+                        st.write(safe_str(r.get("Email Lembaga", "")) or "—")
 
-                    st.markdown("**Profil Organisasi**")
-                    profil = safe_str(r.get("Profil Organisasi", ""))
-                    st.write(profil or "—")
+                        st.markdown("**Profil Organisasi**")
+                        profil = safe_str(r.get("Profil Organisasi", ""))
+                        st.write(profil or "—")
+
+                    with col_b:
+                        st.markdown("**Koordinat Lokasi**")
+                        lat = safe_str(r.get("Latitude", ""))
+                        lon = safe_str(r.get("Longitude", ""))
+                        if lat and lon:
+                            st.write(f"Lat: `{lat}`, Lon: `{lon}`")
+                        else:
+                            st.write(
+                                "Belum ada koordinat latitude/longitude. "
+                                "Dapat diusulkan melalui tab **Koreksi Data**."
+                            )
+
+                        st.markdown("**Kategori Layanan**")
+                        kat = r.get("kategori_layanan", [])
+                        if isinstance(kat, (list, tuple)) and kat:
+                            for c in kat:
+                                st.markdown(f"- {c}")
+                        else:
+                            st.write("—")
 
                     st.markdown("**Layanan yang diberikan**")
                     layanan_list = r.get("layanan_list", [])
@@ -458,14 +496,6 @@ with tab_dir:
                         else:
                             st.write("—")
 
-                    # kategori layanan
-                    st.markdown("**Kategori Layanan**")
-                    kat = r.get("kategori_layanan", [])
-                    if isinstance(kat, (list, tuple)) and kat:
-                        st.write(", ".join(kat))
-                    else:
-                        st.write("—")
-
                     if st.button("Tutup detail"):
                         st.session_state["detail_org"] = None
                         st.rerun()
@@ -480,6 +510,8 @@ with tab_dir:
                     "Kontak Lembaga/Layanan",
                     "Email Lembaga",
                     "kategori_layanan",
+                    "Latitude",
+                    "Longitude",
                 ] if c in table_df.columns]
 
                 table_df = table_df[cols_table].copy()
@@ -492,13 +524,16 @@ with tab_dir:
                     table_df["kategori_layanan"] = table_df["kategori_layanan"].apply(cat_to_text)
 
                 # Rename header ke gaya internasional
-                table_df = table_df.rename(columns={
+                rename_map = {
                     "Nama Organisasi": "Organisation Name",
                     "Alamat Organisasi": "Address",
                     "Kontak Lembaga/Layanan": "Service Contact",
                     "Email Lembaga": "Service Email",
                     "kategori_layanan": "Service Categories",
-                })
+                    "Latitude": "Latitude",
+                    "Longitude": "Longitude",
+                }
+                table_df = table_df.rename(columns=rename_map)
 
                 # Tambah nomor urut
                 table_df.insert(0, "No", range(1, len(table_df) + 1))
@@ -514,10 +549,10 @@ with tab_dir:
                 )
 
 # ==========================
-# TAB 2: KOREKSI DATA (FORM + COUNT)
+# TAB 2: KOREKSI DATA (FORM + COUNT + KOORDINAT)
 # ==========================
 with tab_koreksi:
-    st.subheader("✏️ Form Koreksi Data Lembaga")
+    st.markdown("### ✏️ Form Koreksi Data Lembaga")
 
     suggestions_df = load_suggestions()
     total_suggestions = len(suggestions_df)
@@ -529,8 +564,9 @@ with tab_koreksi:
     st.markdown(
         """
         Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
-        silakan mengisi form berikut. Usulan Anda akan muncul di tab **Admin**
-        untuk ditinjau dan disetujui oleh tim.
+        silakan mengisi form berikut.  
+        Anda juga dapat menambahkan/merapikan **koordinat lokasi (Latitude & Longitude)** 
+        supaya di masa depan lembaga bisa ditampilkan dalam peta Indonesia.
         """
     )
 
@@ -559,9 +595,18 @@ with tab_koreksi:
                 "Email Lembaga",
                 "Layanan Yang Diberikan",
                 "Profil Organisasi",
+                "Koordinat (Latitude/Longitude)",
                 "Lainnya",
             ],
         )
+
+        st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
+        lat_col, lon_col = st.columns(2)
+        with lat_col:
+            lat_val = st.text_input("Latitude (contoh: -6.1767)", key="lat_input")
+        with lon_col:
+            lon_val = st.text_input("Longitude (contoh: 106.8305)", key="lon_input")
+
         usulan = st.text_area(
             "Tuliskan data baru / koreksi yang diusulkan",
             height=150,
@@ -570,8 +615,10 @@ with tab_koreksi:
         submitted = st.form_submit_button("Kirim Usulan Koreksi")
 
         if submitted:
-            if not usulan.strip():
-                st.warning("Mohon isi data koreksi terlebih dahulu.")
+            if not usulan.strip() and not (lat_val.strip() and lon_val.strip()):
+                st.warning(
+                    "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
+                )
             else:
                 suggestions_df = load_suggestions()
                 if suggestions_df.empty:
@@ -587,6 +634,8 @@ with tab_koreksi:
                     "kontak": kontak,
                     "kolom": "; ".join(kolom) if kolom else "",
                     "usulan": usulan.strip(),
+                    "lat": lat_val.strip(),
+                    "lon": lon_val.strip(),
                     "status": "Pending",
                     "processed_at": "",
                 }
@@ -605,7 +654,7 @@ with tab_koreksi:
 # TAB 3: ADMIN – REVIEW & APPROVAL (WITH PASSWORD)
 # ==========================
 with tab_admin:
-    st.subheader("🗂️ Panel Admin – Review & Approval")
+    st.markdown("### 🗂️ Panel Admin – Review & Approval")
 
     pwd = st.text_input(
         "Masukkan admin password untuk mengakses panel:",
@@ -641,7 +690,13 @@ with tab_admin:
                     st.write(f"**Kontak pengaju**: {safe_str(row.get('kontak', '')) or '—'}")
                     st.write(f"**Bagian yang dikoreksi**: {safe_str(row.get('kolom', '')) or '—'}")
                     st.write("**Usulan koreksi:**")
-                    st.write(safe_str(row.get("usulan", "")))
+                    st.write(safe_str(row.get("usulan", "")) or "—")
+
+                    lat_s = safe_str(row.get("lat", ""))
+                    lon_s = safe_str(row.get("lon", ""))
+                    if lat_s or lon_s:
+                        st.write("**Usulan Koordinat:**")
+                        st.write(f"Lat: `{lat_s or '-'}`, Lon: `{lon_s or '-'}`")
 
                     col_a, col_b, col_c = st.columns([1, 1, 3])
                     current_status = status
@@ -672,6 +727,12 @@ with tab_admin:
 
                     col_c.write(f"Status sekarang: **{current_status}**")
 
+            st.markdown("---")
+            st.caption(
+                "Catatan: untuk mengaktifkan peta, koordinat yang sudah di-approve "
+                "bisa dimasukkan ke kolom `Latitude` dan `Longitude` di file utama FPL."
+            )
+
             csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
             st.download_button(
                 "⬇️ Download semua usulan (CSV) untuk diolah offline",
@@ -684,7 +745,7 @@ with tab_admin:
 # TAB 4: TENTANG (PALING KANAN)
 # ==========================
 with tab_about:
-    st.subheader("ℹ️ Tentang Direktori Layanan FPL")
+    st.markdown("### ℹ️ Tentang Direktori Layanan FPL")
     st.markdown(
         """
         Direktori ini disusun untuk membantu:
@@ -699,5 +760,9 @@ with tab_about:
         Direktori akan diperbarui secara berkala berdasarkan:
         - Usulan koreksi dari lembaga.
         - Hasil verifikasi lapangan dan koordinasi jaringan.
+
+        Di masa depan, setelah koordinat lokasi (latitude/longitude) lebih lengkap,
+        akan ditambahkan tampilan **peta interaktif** yang menampilkan sebaran lembaga
+        layanan di seluruh Indonesia.
         """
     )
