@@ -195,13 +195,17 @@ def save_suggestions(df_sug: pd.DataFrame):
 
 df = load_data()
 
-# init session state
+# --------------------------
+# INIT SESSION STATE
+# --------------------------
 if "page" not in st.session_state:
     st.session_state["page"] = 1
 if "koreksi_target_org" not in st.session_state:
     st.session_state["koreksi_target_org"] = None
-if "pending_tab" not in st.session_state:
-    st.session_state["pending_tab"] = None
+if "koreksi_hint" not in st.session_state:
+    st.session_state["koreksi_hint"] = None
+if "detail_org" not in st.session_state:
+    st.session_state["detail_org"] = None
 
 # --------------------------
 # 3. HEADER + LOGO
@@ -222,6 +226,10 @@ with title_col:
     )
 
 st.divider()
+
+# Banner hint (misalnya setelah klik “Usulkan koreksi”)
+if st.session_state.get("koreksi_hint"):
+    st.info(st.session_state["koreksi_hint"])
 
 # --------------------------
 # 4. TABS
@@ -252,6 +260,7 @@ with tab_dir:
             addr = ""
             selected_categories = []
             st.session_state["page"] = 1
+            st.session_state["detail_org"] = None
             st.rerun()
 
     # --- Terapkan filter ---
@@ -291,6 +300,7 @@ with tab_dir:
             with prev_col:
                 if st.button("◀", disabled=st.session_state["page"] <= 1):
                     st.session_state["page"] -= 1
+                    st.session_state["detail_org"] = None
                     st.rerun()
 
             with mid_col:
@@ -303,6 +313,7 @@ with tab_dir:
             with next_col:
                 if st.button("▶", disabled=st.session_state["page"] >= total_pages):
                     st.session_state["page"] += 1
+                    st.session_state["detail_org"] = None
                     st.rerun()
 
     # --- Konten utama (kolom kanan) ---
@@ -378,14 +389,84 @@ with tab_dir:
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
 
-                        # Tombol kecil untuk usulkan koreksi
-                        if st.button(
-                            "✏️ Usulkan koreksi",
-                            key=f"suggest_{start_idx + idx_row}",
-                        ):
-                            st.session_state["koreksi_target_org"] = nama
-                            st.session_state["pending_tab"] = "koreksi"
-                            st.rerun()
+                        bcol1, bcol2 = st.columns([1, 1])
+                        with bcol1:
+                            # Tombol kecil untuk usulkan koreksi
+                            if st.button(
+                                "✏️ Usulkan koreksi",
+                                key=f"suggest_{start_idx + idx_row}",
+                            ):
+                                st.session_state["koreksi_target_org"] = nama
+                                st.session_state["koreksi_hint"] = (
+                                    f"Lembaga **{nama}** sudah otomatis dipilih "
+                                    "di tab **Koreksi Data**. Silakan buka tab tersebut "
+                                    "untuk mengisi formulir koreksi."
+                                )
+                                st.rerun()
+                        with bcol2:
+                            # Tombol lihat detail
+                            if st.button(
+                                "👁 Lihat detail",
+                                key=f"detail_{start_idx + idx_row}",
+                            ):
+                                st.session_state["detail_org"] = nama
+                                st.rerun()
+
+            # ---------- DETAIL VIEW (CV STYLE) ----------
+            if st.session_state.get("detail_org"):
+                detail_org = st.session_state["detail_org"]
+                detail_df = df[df["Nama Organisasi"] == detail_org]
+                if not detail_df.empty:
+                    r = detail_df.iloc[0]
+
+                    st.markdown("---")
+                    st.markdown("### 📄 Profil Lembaga")
+                    st.markdown(f"**{safe_str(r.get('Nama Organisasi', ''))}**")
+
+                    st.markdown("**Alamat**")
+                    st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
+
+                    st.markdown("**Kontak Layanan**")
+                    st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
+
+                    st.markdown("**Email Layanan**")
+                    st.write(safe_str(r.get("Email Lembaga", "")) or "—")
+
+                    # Website jika ada kolom
+                    if "Website" in r.index:
+                        st.markdown("**Website**")
+                        st.write(safe_str(r.get("Website", "")) or "—")
+
+                    st.markdown("**Profil Organisasi**")
+                    profil = safe_str(r.get("Profil Organisasi", ""))
+                    st.write(profil or "—")
+
+                    st.markdown("**Layanan yang diberikan**")
+                    layanan_list = r.get("layanan_list", [])
+                    if isinstance(layanan_list, (list, tuple)) and layanan_list:
+                        for item in layanan_list:
+                            st.write(f"- {safe_str(item)}")
+                    else:
+                        layanan_raw = safe_str(r.get("Layanan Yang Diberikan", ""))
+                        if layanan_raw:
+                            for item in layanan_raw.split(";"):
+                                item = item.strip()
+                                if item:
+                                    st.write(f"- {item}")
+                        else:
+                            st.write("—")
+
+                    # kategori layanan
+                    st.markdown("**Kategori Layanan**")
+                    kat = r.get("kategori_layanan", [])
+                    if isinstance(kat, (list, tuple)) and kat:
+                        st.write(", ".join(kat))
+                    else:
+                        st.write("—")
+
+                    if st.button("Tutup detail"):
+                        st.session_state["detail_org"] = None
+                        st.rerun()
 
             # ---------- EXPANDER: FULL TABLE + DOWNLOAD ----------
             with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
@@ -512,6 +593,7 @@ with tab_koreksi:
                     ignore_index=True,
                 )
                 save_suggestions(suggestions_df)
+                st.session_state["koreksi_hint"] = None
                 st.success(
                     "Terima kasih, usulan koreksi Anda sudah tercatat. "
                     "Admin akan meninjau sebelum mengubah data utama."
@@ -617,20 +699,3 @@ with tab_about:
         - Hasil verifikasi lapangan dan koordinasi jaringan.
         """
     )
-
-# --------------------------
-# JS HACK: AUTO PINDAH TAB KE "KOREKSI DATA"
-# --------------------------
-if st.session_state.get("pending_tab") == "koreksi":
-    # tab index 1 = Koreksi Data
-    st.markdown(
-        """
-        <script>
-        const tabs = window.parent.document.querySelectorAll('button[role="tab"]');
-        if (tabs.length > 1) { tabs[1].click(); }
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
-    # clear flag supaya tidak lompat terus
-    st.session_state["pending_tab"] = None
