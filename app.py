@@ -170,6 +170,7 @@ def load_suggestions():
 
         return df[required_cols]
     else:
+        # belum ada file → mulai dengan df kosong berkolom lengkap
         return pd.DataFrame(columns=required_cols)
 
 
@@ -184,8 +185,8 @@ df = load_data()
 # --------------------------
 def search_directory(df: pd.DataFrame, question: str, top_k: int = 5):
     """
-    Simple keyword-based search: hitung berapa banyak kata kunci
-    dari pertanyaan yang muncul di setiap lembaga.
+    Pencarian sederhana berbasis keyword: hitung berapa banyak token
+    pertanyaan muncul di setiap lembaga.
     """
     q = question.lower()
     tokens = [t for t in re.split(r"\W+", q) if len(t) >= 3]
@@ -319,9 +320,14 @@ with tab_dir:
 
                         kat_str = ", ".join(kategori_list) if kategori_list else "tidak tercantum"
 
+                        if len(alamat) > 180:
+                            alamat_disp = alamat[:180] + "…"
+                        else:
+                            alamat_disp = alamat
+
                         st.markdown(
                             f"- **{nama}** – {kat_str}\n"
-                            f"  \n  _{alamat[:180] + '…' if len(alamat) > 180 else alamat}_"
+                            f"  \n  _{alamat_disp}_"
                         )
 
         st.markdown("---")
@@ -484,20 +490,22 @@ with tab_admin:
             st.metric("Usulan Pending", pending_count)
 
             for idx, row in suggestions_df.iterrows():
-                title = f"[{row['status']}] {row['organisasi']} "
-                if row["pengaju"]:
-                    title += f"(oleh {row['pengaju']})"
+                status = row.get("status", "Pending")
+                org = row.get("organisasi", "")
+                pengaju = row.get("pengaju", "") or "—"
 
-                box = st.expander(title, expanded=(row["status"] == "Pending"))
+                title = f"[{status}] {org} (oleh {pengaju})"
+
+                box = st.expander(title, expanded=(status == "Pending"))
                 with box:
-                    st.write(f"**Waktu pengajuan**: {row['timestamp']}")
-                    st.write(f"**Kontak pengaju**: {row['kontak'] or '—'}")
-                    st.write(f"**Bagian yang dikoreksi**: {row['kolom'] or '—'}")
+                    st.write(f"**Waktu pengajuan**: {row.get('timestamp', '')}")
+                    st.write(f"**Kontak pengaju**: {row.get('kontak', '') or '—'}")
+                    st.write(f"**Bagian yang dikoreksi**: {row.get('kolom', '') or '—'}")
                     st.write("**Usulan koreksi:**")
-                    st.write(row["usulan"])
+                    st.write(row.get("usulan", ""))
 
                     col_a, col_b, col_c = st.columns([1, 1, 3])
-                    current_status = row["status"]
+                    current_status = status
 
                     if col_a.button(
                         "✅ Approve",
