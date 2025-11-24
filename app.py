@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import datetime
+import re
 
 # --------------------------
 # CONFIG & CONSTANTS
@@ -16,7 +17,7 @@ DATA_PATH = Path(__file__).parent / "fpl database.csv"
 FPL_LOGO_PATH = Path(__file__).parent / "fpl_logo.png"  # optional
 SUGGEST_PATH = Path(__file__).parent / "edit_suggestions.csv"
 
-# CSS: rapikan layout + turunkan isi tab sedikit
+# CSS: layout, tabs, card & tag
 st.markdown(
     """
     <style>
@@ -27,15 +28,53 @@ st.markdown(
     .sidebar-content {
         padding-top: 1rem;
     }
-    /* Tambah jarak isi tab dari garis tab, supaya judul tidak kepotong */
+    /* jarak isi tab dari garis tab */
     .stTabs [data-baseweb="tab-panel"] {
         padding-top: 1rem;
+    }
+    /* card lembaga */
+    .org-card {
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.9rem;
+        border-radius: 0.85rem;
+        border: 1px solid #e5e7eb;
+        background-color: #ffffff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    .org-name {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.15rem;
+    }
+    .org-address {
+        font-size: 0.88rem;
+        color: #4b5563;
+        margin-bottom: 0.25rem;
+    }
+    .org-meta {
+        font-size: 0.85rem;
+        color: #374151;
+        margin-bottom: 0.2rem;
+    }
+    .org-meta span.label {
+        font-weight: 600;
+        color: #6b7280;
+    }
+    .tag {
+        display: inline-block;
+        padding: 0.15rem 0.55rem;
+        margin: 0 0.25rem 0.25rem 0;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        background-color: #eef2ff;  /* indigo-50 */
+        color: #3730a3;              /* indigo-800 */
+        border: 1px solid #c7d2fe;   /* indigo-200 */
+        white-space: nowrap;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # --------------------------
 # 1. LOAD & PREPARE MAIN DATA
@@ -125,7 +164,6 @@ def load_suggestions():
             if c not in df.columns:
                 df[c] = ""
 
-        # pastikan id numerik
         df["id"] = pd.to_numeric(df["id"], errors="coerce")
         if df["id"].isna().any():
             df["id"] = range(1, len(df) + 1)
@@ -140,11 +178,45 @@ def save_suggestions(df_sug: pd.DataFrame):
 
 
 df = load_data()
-suggestions_df = load_suggestions()
+
+# --------------------------
+# 2. SIMPLE "LLM-LIKE" SEARCH ENGINE
+# --------------------------
+def search_directory(df: pd.DataFrame, question: str, top_k: int = 5):
+    """
+    Simple keyword-based search: hitung berapa banyak kata kunci
+    dari pertanyaan yang muncul di setiap lembaga.
+    """
+    q = question.lower()
+    tokens = [t for t in re.split(r"\W+", q) if len(t) >= 3]
+    if not tokens:
+        return pd.DataFrame()
+
+    scores = []
+    for idx, row in df.iterrows():
+        parts = [
+            str(row.get("Nama Organisasi", "")),
+            str(row.get("Alamat Organisasi", "")),
+            " ".join(row.get("kategori_layanan", []))
+            if isinstance(row.get("kategori_layanan"), (list, tuple))
+            else str(row.get("kategori_layanan", "")),
+            str(row.get("Layanan Yang Diberikan", "")),
+        ]
+        doc = " ".join(parts).lower()
+        score = sum(doc.count(tok) for tok in tokens)
+        if score > 0:
+            scores.append((score, idx))
+
+    scores.sort(reverse=True)
+    if not scores:
+        return pd.DataFrame()
+
+    best_indices = [idx for _, idx in scores[:top_k]]
+    return df.loc[best_indices].copy()
 
 
 # --------------------------
-# 2. HEADER + LOGO
+# 3. HEADER + LOGO
 # --------------------------
 logo_col, title_col = st.columns([1, 4])
 
@@ -163,22 +235,22 @@ with title_col:
 
 st.divider()
 
-
 # --------------------------
-# 3. TABS
+# 4. TABS
 # --------------------------
-tab_dir, tab_about, tab_admin = st.tabs(
-    ["📊 Direktori", "ℹ️ Tentang", "✏️ Koreksi Data & Admin"]
+tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
+    ["📊 Direktori", "✏️ Koreksi Data", "🗂️ Admin", "ℹ️ Tentang"]
 )
 
 # ==========================
-# TAB 1: DIREKTORI
+# TAB 1: DIREKTORI (CARD VIEW + "LLM")
 # ==========================
 with tab_dir:
     st.subheader("📊 Direktori Layanan")
 
     fcol1, fcol2 = st.columns([1, 3])
 
+    # --- Filter ---
     with fcol1:
         st.markdown("#### 🔎 Filter")
         name = st.text_input("Cari Nama Organisasi")
@@ -213,93 +285,121 @@ with tab_dir:
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
         )
 
-        # Kolom yang ditampilkan (tanpa "Layanan Yang Diberikan")
-        cols = [c for c in [
-            "Nama Organisasi",
-            "Alamat Organisasi",
-            "Kontak Lembaga/Layanan",
-            "Email Lembaga",
-            "kategori_layanan",
-        ] if c in filtered.columns]
+        # ---- LLM-like Q&A section ----
+        st.markdown("#### 🤖 Tanya Direktori (Knowledge Search)")
 
-        show_df = filtered[cols].copy()
+        qa_question = st.text_area(
+            "Tulis pertanyaan Anda (contoh: *“Lembaga yang punya shelter aman di Jakarta”*):",
+            height=80,
+        )
+        if st.button("Cari jawaban", key="qa_button"):
+            if not qa_question.strip():
+                st.warning("Silakan tulis pertanyaan terlebih dahulu.")
+            else:
+                results = search_directory(df, qa_question, top_k=5)
+                if results.empty:
+                    st.info(
+                        "Belum menemukan lembaga yang cocok dengan pertanyaan tersebut. "
+                        "Coba gunakan kata kunci wilayah atau jenis layanan."
+                    )
+                else:
+                    st.write(
+                        f"Aku menemukan **{len(results)}** lembaga yang paling relevan:"
+                    )
+                    for _, row in results.iterrows():
+                        nama = row.get("Nama Organisasi", "").strip()
+                        alamat = row.get("Alamat Organisasi", "").strip()
+                        kategori = row.get("kategori_layanan", [])
+                        if isinstance(kategori, str):
+                            kategori_list = [
+                                k.strip() for k in kategori.split(",") if k.strip()
+                            ]
+                        else:
+                            kategori_list = kategori or []
 
-        # Ubah list kategori_layanan jadi teks
-        if "kategori_layanan" in show_df.columns:
-            show_df["kategori_layanan"] = show_df["kategori_layanan"].apply(
-                lambda x: ", ".join(x) if isinstance(x, (list, tuple)) else str(x)
-            )
+                        kat_str = ", ".join(kategori_list) if kategori_list else "tidak tercantum"
 
-        # Pendekkan alamat supaya tabel tidak terlalu lebar
-        if "Alamat Organisasi" in show_df.columns:
-            show_df["Alamat Organisasi"] = (
-                show_df["Alamat Organisasi"]
-                .fillna("")
-                .astype(str)
-                .str.slice(0, 160) + "…"
-            )
+                        st.markdown(
+                            f"- **{nama}** – {kat_str}\n"
+                            f"  \n  _{alamat[:180] + '…' if len(alamat) > 180 else alamat}_"
+                        )
 
-        # Rename header ke gaya internasional
-        show_df = show_df.rename(columns={
-            "Nama Organisasi": "Organisation Name",
-            "Alamat Organisasi": "Address",
-            "Kontak Lembaga/Layanan": "Service Contact",
-            "Email Lembaga": "Service Email",
-            "kategori_layanan": "Service Categories",
-        })
+        st.markdown("---")
 
-        # Tambah nomor urut
-        show_df.insert(0, "No", range(1, len(show_df) + 1))
+        # ---- Card view for filtered results ----
+        if filtered_count == 0:
+            st.info("Belum ada lembaga yang cocok dengan filter.")
+        else:
+            cards_df = filtered.reset_index(drop=True)
+            n_cols = 2 if len(cards_df) > 1 else 1
 
-        st.dataframe(show_df, use_container_width=True)
+            for i in range(0, len(cards_df), n_cols):
+                cols = st.columns(n_cols)
+                chunk = cards_df.iloc[i:i + n_cols]
 
-    st.info(
-        "Untuk mengusulkan koreksi data lembaga, silakan buka tab "
-        "**✏️ Koreksi Data & Admin**."
-    )
+                for col, (_, row) in zip(cols, chunk.iterrows()):
+                    with col:
+                        nama = row.get("Nama Organisasi", "").strip()
+                        alamat = row.get("Alamat Organisasi", "").strip()
+                        kontak = row.get("Kontak Lembaga/Layanan", "").strip()
+                        email = row.get("Email Lembaga", "").strip()
+                        kategori = row.get("kategori_layanan", [])
 
+                        if isinstance(kategori, str):
+                            kategori_list = [k.strip() for k in kategori.split(",") if k.strip()]
+                        else:
+                            kategori_list = kategori or []
+
+                        if len(alamat) > 200:
+                            alamat_disp = alamat[:200] + "…"
+                        else:
+                            alamat_disp = alamat
+
+                        tags_html = ""
+                        for cat in kategori_list:
+                            tags_html += f'<span class="tag">{cat}</span>'
+
+                        card_html = f"""
+                        <div class="org-card">
+                            <div class="org-name">{nama}</div>
+                            <div class="org-address">{alamat_disp}</div>
+                            <div class="org-meta">
+                                <span class="label">Service Contact:</span>
+                                {'-' if not kontak else kontak}
+                            </div>
+                            <div class="org-meta">
+                                <span class="label">Service Email:</span>
+                                {'-' if not email else email}
+                            </div>
+                            <div class="org-meta">
+                                <span class="label">Service Categories:</span><br/>
+                                {tags_html if tags_html else '<span class="tag">Not specified</span>'}
+                            </div>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
 
 # ==========================
-# TAB 2: TENTANG
+# TAB 2: KOREKSI DATA (FORM + COUNT)
 # ==========================
-with tab_about:
-    st.subheader("ℹ️ Tentang Direktori Layanan FPL")
-    st.markdown(
-        """
-        Direktori ini disusun untuk membantu:
+with tab_koreksi:
+    st.subheader("✏️ Form Koreksi Data Lembaga")
 
-        - Penyintas kekerasan dan pendamping menemukan **lembaga layanan yang relevan dan terdekat**.
-        - Jaringan FPL dan mitra melihat **peta layanan** berdasarkan jenis layanan dan wilayah.
-        
-        **Sumber data:**
-        - Kompilasi lembaga anggota dan mitra Forum Pengada Layanan (FPL).
-        - Informasi dikumpulkan melalui formulir dan proses verifikasi internal.
-        
-        Direktori akan diperbarui secara berkala berdasarkan:
-        - Usulan koreksi dari lembaga.
-        - Hasil verifikasi lapangan dan koordinasi jaringan.
-        """
-    )
+    suggestions_df = load_suggestions()
+    total_suggestions = len(suggestions_df)
 
-
-# ==========================
-# TAB 3: KOREKSI DATA & ADMIN
-# ==========================
-with tab_admin:
-    st.subheader("✏️ Ajukan Koreksi Data Lembaga")
+    col_info, col_blank = st.columns([1, 3])
+    with col_info:
+        st.metric("Total usulan koreksi yang tercatat", total_suggestions)
 
     st.markdown(
         """
         Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
-        silakan mengisi form di bawah ini.
-
-        Usulan akan muncul di tabel di bagian bawah (status **Pending**) dan
-        dapat di-approve / reject oleh admin. Perubahan ke file utama
-        tetap dilakukan manual supaya aman.
+        silakan mengisi form berikut. Usulan Anda akan muncul di tab **Admin**
+        untuk ditinjau dan disetujui oleh tim.
         """
     )
 
-    # ---------- FORM INPUT KOREKSI ----------
     with st.form("suggest_form"):
         org_name = st.selectbox(
             "Pilih lembaga yang ingin dikoreksi",
@@ -353,70 +453,104 @@ with tab_admin:
                 save_suggestions(suggestions_df)
                 st.success(
                     "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                    "Admin dapat melihatnya di tabel di bawah."
+                    "Admin akan meninjau sebelum mengubah data utama."
                 )
 
-    st.markdown("---")
-    st.subheader("📥 Panel Admin – Review & Approval")
+# ==========================
+# TAB 3: ADMIN – REVIEW & APPROVAL (WITH PASSWORD)
+# ==========================
+with tab_admin:
+    st.subheader("🗂️ Panel Admin – Review & Approval")
 
-    suggestions_df = load_suggestions()
+    pwd = st.text_input(
+        "Masukkan admin password untuk mengakses panel:",
+        type="password",
+        key="admin_pwd",
+    )
 
-    if suggestions_df.empty:
-        st.caption("Belum ada usulan koreksi yang tercatat.")
+    if pwd != "renolds":
+        st.info("Masukkan password yang benar untuk melihat dan mengelola usulan koreksi.")
     else:
-        # urutkan paling baru di atas
-        suggestions_df = suggestions_df.sort_values(
-            "timestamp", ascending=False
-        ).reset_index(drop=True)
+        suggestions_df = load_suggestions()
 
-        # tampilkan per baris dengan tombol Approve / Reject
-        for idx, row in suggestions_df.iterrows():
-            title = f"[{row['status']}] {row['organisasi']} "
-            if row["pengaju"]:
-                title += f"(oleh {row['pengaju']})"
+        if suggestions_df.empty:
+            st.caption("Belum ada usulan koreksi yang tercatat.")
+        else:
+            suggestions_df = suggestions_df.sort_values(
+                "timestamp", ascending=False
+            ).reset_index(drop=True)
 
-            box = st.expander(title, expanded=(row["status"] == "Pending"))
-            with box:
-                st.write(f"**Waktu pengajuan**: {row['timestamp']}")
-                st.write(f"**Kontak pengaju**: {row['kontak'] or '—'}")
-                st.write(f"**Bagian yang dikoreksi**: {row['kolom'] or '—'}")
-                st.write("**Usulan koreksi:**")
-                st.write(row["usulan"])
+            pending_count = (suggestions_df["status"] == "Pending").sum()
+            st.metric("Usulan Pending", pending_count)
 
-                col_a, col_b, col_c = st.columns([1, 1, 3])
-                current_status = row["status"]
+            for idx, row in suggestions_df.iterrows():
+                title = f"[{row['status']}] {row['organisasi']} "
+                if row["pengaju"]:
+                    title += f"(oleh {row['pengaju']})"
 
-                if col_a.button(
-                    "✅ Approve",
-                    key=f"approve_{int(row['id'])}",
-                    use_container_width=True,
-                ):
-                    suggestions_df.loc[idx, "status"] = "Approved"
-                    suggestions_df.loc[idx, "processed_at"] = (
-                        datetime.datetime.utcnow().isoformat()
-                    )
-                    save_suggestions(suggestions_df)
-                    st.experimental_rerun()
+                box = st.expander(title, expanded=(row["status"] == "Pending"))
+                with box:
+                    st.write(f"**Waktu pengajuan**: {row['timestamp']}")
+                    st.write(f"**Kontak pengaju**: {row['kontak'] or '—'}")
+                    st.write(f"**Bagian yang dikoreksi**: {row['kolom'] or '—'}")
+                    st.write("**Usulan koreksi:**")
+                    st.write(row["usulan"])
 
-                if col_b.button(
-                    "❌ Reject",
-                    key=f"reject_{int(row['id'])}",
-                    use_container_width=True,
-                ):
-                    suggestions_df.loc[idx, "status"] = "Rejected"
-                    suggestions_df.loc[idx, "processed_at"] = (
-                        datetime.datetime.utcnow().isoformat()
-                    )
-                    save_suggestions(suggestions_df)
-                    st.experimental_rerun()
+                    col_a, col_b, col_c = st.columns([1, 1, 3])
+                    current_status = row["status"]
 
-                col_c.write(f"Status sekarang: **{current_status}**")
+                    if col_a.button(
+                        "✅ Approve",
+                        key=f"approve_{int(row['id'])}",
+                        use_container_width=True,
+                    ):
+                        suggestions_df.loc[idx, "status"] = "Approved"
+                        suggestions_df.loc[idx, "processed_at"] = (
+                            datetime.datetime.utcnow().isoformat()
+                        )
+                        save_suggestions(suggestions_df)
+                        st.experimental_rerun()
 
-        # Tombol download semua koreksi
-        csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download semua usulan (CSV) untuk diolah offline",
-            data=csv_data,
-            file_name="edit_suggestions_fpl.csv",
-            mime="text/csv",
-        )
+                    if col_b.button(
+                        "❌ Reject",
+                        key=f"reject_{int(row['id'])}",
+                        use_container_width=True,
+                    ):
+                        suggestions_df.loc[idx, "status"] = "Rejected"
+                        suggestions_df.loc[idx, "processed_at"] = (
+                            datetime.datetime.utcnow().isoformat()
+                        )
+                        save_suggestions(suggestions_df)
+                        st.experimental_rerun()
+
+                    col_c.write(f"Status sekarang: **{current_status}**")
+
+            csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Download semua usulan (CSV) untuk diolah offline",
+                data=csv_data,
+                file_name="edit_suggestions_fpl.csv",
+                mime="text/csv",
+            )
+
+# ==========================
+# TAB 4: TENTANG (PALING KANAN)
+# ==========================
+with tab_about:
+    st.subheader("ℹ️ Tentang Direktori Layanan FPL")
+    st.markdown(
+        """
+        Direktori ini disusun untuk membantu:
+
+        - Penyintas kekerasan dan pendamping menemukan **lembaga layanan yang relevan dan terdekat**.
+        - Jaringan FPL dan mitra melihat **peta layanan** berdasarkan jenis layanan dan wilayah.
+        
+        **Sumber data:**
+        - Kompilasi lembaga anggota dan mitra Forum Pengada Layanan (FPL).
+        - Informasi dikumpulkan melalui formulir dan proses verifikasi internal.
+        
+        Direktori akan diperbarui secara berkala berdasarkan:
+        - Usulan koreksi dari lembaga.
+        - Hasil verifikasi lapangan dan koordinasi jaringan.
+        """
+    )
