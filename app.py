@@ -221,7 +221,31 @@ def load_fpl() -> pd.DataFrame:
         ]
     ]
 
-
+def _read_excel_safe(path: Path, sheet_name: str):
+    """Coba baca Excel; kalau gagal (file/engine), kembalikan None."""
+    if not path.exists():
+        return None
+    try:
+        return pd.read_excel(
+            path,
+            sheet_name=sheet_name,
+            header=None,
+            engine="openpyxl",  # paksa pakai openpyxl
+        )
+    except ImportError:
+        # Kalau openpyxl belum terinstall, jangan crash
+        st.warning(
+            f"Tidak dapat membaca '{path.name}' (library openpyxl belum terinstall). "
+            "Data UPTD akan dilewati sampai dependensi terpasang."
+        )
+        return None
+    except Exception as e:
+        st.warning(
+            f"Gagal membaca sheet '{sheet_name}' dari '{path.name}': {e}. "
+            "Data UPTD akan dilewati."
+        )
+        return None
+        
 def load_uptd_prov() -> pd.DataFrame:
     raw = _read_excel_safe(UPTD_XLSX, sheet_name="UPTD PPA Provinsi")
     if raw is None:
