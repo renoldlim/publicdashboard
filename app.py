@@ -455,8 +455,11 @@ with title_col:
 
 st.divider()
 
-if st.session_state.get("koreksi_hint"):
-    st.info(st.session_state["koreksi_hint"])
+st.session_state["koreksi_hint"] = (
+    f"Lembaga **{nama}** sudah otomatis dipilih di "
+    "bagian *Usulan Koreksi Cepat* di bawah. "
+    "Silakan scroll atau klik tautan ke form."
+)
 
 # ============================================================
 # 7. TABS
@@ -469,9 +472,16 @@ tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
 # TAB: DIREKTORI
 # ============================================================
 with tab_dir:
-    # anchor untuk header direktori
-    st.markdown('<a name="direktori-layanan"></a>', unsafe_allow_html=True)
-    st.markdown("### 📊 Direktori Layanan")
+    # Heading dengan anchor + icon link
+    st.markdown(
+        """
+        <h3 id="direktori-layanan" style="margin-bottom:0.75rem;">
+          📊 Direktori Layanan
+          <a href="#direktori-layanan" style="text-decoration:none;">↪</a>
+        </h3>
+        """,
+        unsafe_allow_html=True,
+    )
 
     fcol1, fcol2 = st.columns([1, 3])
 
@@ -777,8 +787,15 @@ with tab_dir:
 
         # ---------- USULAN KOREKSI CEPAT (ANCHOR) ----------
         st.markdown("---")
-        st.markdown('<a name="usulan-koreksi-cepat"></a>', unsafe_allow_html=True)
-        st.markdown("#### ✏️ Usulan Koreksi Cepat")
+        st.markdown(
+            """
+            <h4 id="usulan-koreksi-cepat" style="margin-top:0.5rem;">
+              ✏️ Usulan Koreksi Cepat
+              <a href="#usulan-koreksi-cepat" style="text-decoration:none;">↪</a>
+            </h4>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
             """
