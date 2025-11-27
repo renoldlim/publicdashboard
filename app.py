@@ -20,6 +20,7 @@ UPTD_XLSX = BASE_DIR / "Data UPTD PPA_2025 (1).xlsx"
 SUGGEST_PATH = BASE_DIR / "edit_suggestions.csv"
 FPL_LOGO_PATH = BASE_DIR / "fpl_logo.png"  # opsional, abaikan jika belum ada file
 
+
 # ============================================================
 # 1. HELPER FUNCTIONS & STYLES
 # ============================================================
@@ -320,7 +321,7 @@ def load_uptd_kabkota() -> pd.DataFrame:
 
     out = pd.DataFrame()
     out["Nama Organisasi"] = "UPTD PPA " + kab_clean + " (" + prov_clean + ")"
-    out["Alamat Organisasi"] = df["ALAM_KANTOR"] if "ALAM_KANTOR" in df.columns else df["ALAMAT_KANTOR"]
+    out["Alamat Organisasi"] = df["ALAMAT_KANTOR"]
     out["Kontak Lembaga/Layanan"] = df["HOTLINE"].fillna(df["TELP_KANTOR"])
     out["Email Lembaga"] = ""
     out["Profil Organisasi"] = (
@@ -425,8 +426,6 @@ if "koreksi_target_org" not in st.session_state:
     st.session_state["koreksi_target_org"] = None
 if "koreksi_hint" not in st.session_state:
     st.session_state["koreksi_hint"] = None
-if "jump_to_koreksi" not in st.session_state:
-    st.session_state["jump_to_koreksi"] = False
 if "show_detail" not in st.session_state:
     st.session_state["show_detail"] = False
 if "detail_org" not in st.session_state:
@@ -455,11 +454,9 @@ with title_col:
 
 st.divider()
 
-st.session_state["koreksi_hint"] = (
-    f"Lembaga **{nama}** sudah otomatis dipilih di "
-    "bagian *Usulan Koreksi Cepat* di bawah. "
-    "Silakan scroll atau klik tautan ke form."
-)
+# Info setelah klik "Usulkan koreksi"
+if st.session_state.get("koreksi_hint"):
+    st.info(st.session_state["koreksi_hint"])
 
 # ============================================================
 # 7. TABS
@@ -472,7 +469,7 @@ tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
 # TAB: DIREKTORI
 # ============================================================
 with tab_dir:
-    # Heading dengan anchor + icon link
+    # Heading dengan anchor dan ikon link sederhana
     st.markdown(
         """
         <h3 id="direktori-layanan" style="margin-bottom:0.75rem;">
@@ -502,7 +499,6 @@ with tab_dir:
             st.session_state["show_detail"] = False
             st.session_state["detail_org"] = None
             st.session_state["koreksi_hint"] = None
-            st.session_state["jump_to_koreksi"] = False
             st.rerun()
 
     filtered = df.copy()
@@ -630,7 +626,7 @@ with tab_dir:
 
                         bcol1, bcol2 = st.columns(2)
 
-                        # Tombol usulan koreksi → set target + info link ke bawah
+                        # Tombol usulan koreksi → simpan target + pesan dengan link ke anchor form
                         with bcol1:
                             if st.button(
                                 "✏️ Usulkan koreksi",
@@ -639,11 +635,9 @@ with tab_dir:
                             ):
                                 st.session_state["koreksi_target_org"] = nama
                                 st.session_state["koreksi_hint"] = (
-                                    f"Lembaga **{nama}** sudah otomatis dipilih di "
-                                    "bagian *Usulan Koreksi Cepat* di bawah. "
-                                    "Silakan scroll atau klik tautan ke form."
+                                    f"Lembaga **{nama}** sudah otomatis dipilih di bagian "
+                                    "[Usulan Koreksi Cepat](#usulan-koreksi-cepat)."
                                 )
-                                st.session_state["jump_to_koreksi"] = True
                                 st.rerun()
 
                         with bcol2:
@@ -656,7 +650,7 @@ with tab_dir:
                                 st.session_state["show_detail"] = True
                                 st.rerun()
 
-        # ---------- DETAIL SECTION (NON MODAL) ----------
+        # ---------- DETAIL SECTION ----------
         if st.session_state.get("show_detail") and st.session_state.get("detail_org"):
             org_name = st.session_state["detail_org"]
             detail_df = df[df["Nama Organisasi"] == org_name]
@@ -721,21 +715,6 @@ with tab_dir:
                     st.session_state["show_detail"] = False
                     st.session_state["detail_org"] = None
                     st.rerun()
-
-        # ---------- INFO LINK KE FORM CEPAT (JIKA BARU KLIK CARD) ----------
-        if st.session_state.get("jump_to_koreksi"):
-            st.markdown(
-                """
-                <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
-                  ⬇️ Klik link ini untuk langsung ke form:
-                  <a href="https://renoldlim.streamlit.app/~/+/#usulan-koreksi-cepat">
-                    Usulan Koreksi Cepat
-                  </a>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            # jangan reset di sini, biar pesan tetap ada sampai user reload/scroll
 
         # ---------- TABEL + DOWNLOAD ----------
         with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
@@ -886,12 +865,11 @@ with tab_dir:
                         "Admin akan meninjau sebelum mengubah data utama."
                     )
 
-        # ---------- GO UP BUTTON ----------
-        st.markdown("---")
+        # ---------- GO UP LINK ----------
         st.markdown(
             """
             <div style='text-align:right; margin-top:0.5rem;'>
-              <a href="https://renoldlim.streamlit.app/~/+/#direktori-layanan">
+              <a href="#direktori-layanan">
                 ⬆️ Kembali ke atas (Direktori Layanan)
               </a>
             </div>
