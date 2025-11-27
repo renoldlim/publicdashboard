@@ -4,9 +4,6 @@ import numpy as np
 from pathlib import Path
 import datetime
 import math
-import base64
-import requests
-import io
 
 # ============================================================
 # 0. CONFIG
@@ -21,13 +18,13 @@ BASE_DIR = Path(__file__).parent
 FPL_CSV = BASE_DIR / "fpl database.csv"
 UPTD_XLSX = BASE_DIR / "Data UPTD PPA_2025 (1).xlsx"
 SUGGEST_PATH = BASE_DIR / "edit_suggestions.csv"
-FPL_LOGO_PATH = BASE_DIR / "fpl_logo.png"  # opsional
+FPL_LOGO_PATH = BASE_DIR / "fpl_logo.png"  # opsional, abaikan jika belum ada file
 
 # ============================================================
-# 1. HELPER FUNCTIONS
+# 1. HELPER FUNCTIONS & STYLES
 # ============================================================
 def safe_str(val) -> str:
-    """Konversi nilai apa pun (termasuk NaN/None) ke string aman."""
+    """Konversi nilai (termasuk NaN/None/float) ke string aman."""
     if val is None:
         return ""
     try:
@@ -38,7 +35,6 @@ def safe_str(val) -> str:
     return str(val).strip()
 
 
-# ---------- CSS ----------
 st.markdown(
     """
     <style>
@@ -94,7 +90,6 @@ st.markdown(
         border: 1px solid #c7d2fe;
         white-space: nowrap;
     }
-
     .source-badge {
         font-size: 0.72rem;
         padding: 0.1rem 0.55rem;
@@ -103,23 +98,23 @@ st.markdown(
         white-space: nowrap;
     }
     .source-fpl {
-        background-color: #f5f3ff;   /* ungu muda */
-        color: #5b21b6;              /* ungu tua */
+        background-color: #f5f3ff;
+        color: #5b21b6;
         border-color: #ddd6fe;
     }
     .source-prov {
-        background-color: #eff6ff;   /* biru muda */
-        color: #1d4ed8;              /* biru tua */
+        background-color: #eff6ff;
+        color: #1d4ed8;
         border-color: #bfdbfe;
     }
     .source-kab {
-        background-color: #ecfdf5;   /* hijau muda */
-        color: #047857;              /* hijau tua */
+        background-color: #ecfdf5;
+        color: #047857;
         border-color: #bbf7d0;
     }
     .source-other {
-        background-color: #f3f4f6;   /* abu muda */
-        color: #4b5563;              /* abu tua */
+        background-color: #f3f4f6;
+        color: #4b5563;
         border-color: #d1d5db;
     }
     </style>
@@ -129,7 +124,7 @@ st.markdown(
 
 
 def get_source_badge_html(source_raw: str) -> str:
-    """Return HTML span untuk badge sumber data dengan warna berbeda."""
+    """Badge kecil berwarna sesuai sumber data."""
     source = safe_str(source_raw) or "Tidak diketahui"
     s = source.lower()
 
@@ -146,15 +141,17 @@ def get_source_badge_html(source_raw: str) -> str:
 
 
 # ============================================================
-# 2. LOAD & PREPARE DATA (FPL + UPTD PROV + UPTD KAB/KOTA)
+# 2. KATEGORI LAYANAN & EKSTRAK
 # ============================================================
-
-# definisi kategori layanan dari teks
 KATEGORI_DEFS = {
     "Evakuasi": ["evakuasi"],
     "Hukum / Litigasi": ["hukum", "litigasi", "bantuan hukum", "pendampingan hukum"],
     "Konseling & Psikologis": [
-        "konseling", "psikolog", "psikososial", "support group", "trauma"
+        "konseling",
+        "psikolog",
+        "psikososial",
+        "support group",
+        "trauma",
     ],
     "Medis": ["medis", "kesehatan", "rumah sakit", "puskesmas"],
     "Pelatihan & Keterampilan": ["pelatihan", "keterampilan", "kursus", "training"],
@@ -181,8 +178,11 @@ def _extract_kategori(text: str) -> list[str]:
     return sorted(hasil)
 
 
+# ============================================================
+# 3. LOAD DATA FPL & UPTD
+# ============================================================
 def _read_excel_safe(path: Path, sheet_name: str):
-    """Coba baca Excel; kalau gagal (file/engine), kembalikan None."""
+    """Coba baca Excel; kalau gagal (engine, dll.) → None, dengan warning."""
     if not path.exists():
         return None
     try:
@@ -190,11 +190,11 @@ def _read_excel_safe(path: Path, sheet_name: str):
             path,
             sheet_name=sheet_name,
             header=None,
-            engine="openpyxl",  # gunakan openpyxl (pastikan di requirements)
+            engine="openpyxl",
         )
     except ImportError:
         st.warning(
-            f"Tidak dapat membaca '{path.name}' (library openpyxl belum terinstall). "
+            f"Tidak dapat membaca '{path.name}' (openpyxl belum diinstall). "
             "Data UPTD akan dilewati sampai dependensi terpasang."
         )
         return None
@@ -223,7 +223,6 @@ def load_fpl() -> pd.DataFrame:
     df["Latitude"] = np.nan
     df["Longitude"] = np.nan
 
-    # pastikan kolom standar
     for col in [
         "Nama Organisasi",
         "Alamat Organisasi",
@@ -270,15 +269,15 @@ def load_uptd_prov() -> pd.DataFrame:
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^PROVINSI\s+", "", regex=True)
+        .str.replace(r"^PROVINSI\\s+", "", regex=True)
         .str.title()
     )
 
     out = pd.DataFrame()
     out["Nama Organisasi"] = "UPTD PPA " + prov_clean
     out["Alamat Organisasi"] = df["ALAMAT_KANTOR"]
-    out["Kontak Lembaga/Layanan"] = (
-        df["HOTLINE"].replace({0: np.nan}).fillna(df["TELP_KANTOR"])
+    out["Kontak Lembaga/Layanan"] = df["HOTLINE"].replace({0: np.nan}).fillna(
+        df["TELP_KANTOR"]
     )
     out["Email Lembaga"] = ""
     out["Profil Organisasi"] = "UPTD PPA tingkat provinsi di Provinsi " + prov_clean
@@ -309,26 +308,23 @@ def load_uptd_kabkota() -> pd.DataFrame:
     )
 
     df = df[df["KABKOTA"].notna()]
-    df = df[df["KABKOTA"] != "(4)"]  # buang baris header dalam data
+    df = df[df["KABKOTA"] != "(4)"]  # buang baris header nyasar
 
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^Provinsi\s+", "", regex=True)
+        .str.replace(r"^Provinsi\\s+", "", regex=True)
         .str.title()
     )
     kab_clean = df["KABKOTA"].astype(str).str.title()
 
     out = pd.DataFrame()
     out["Nama Organisasi"] = "UPTD PPA " + kab_clean + " (" + prov_clean + ")"
-    out["Alamat Organisasi"] = df["ALAMAT_KANTOR"]
+    out["Alamat Organisasi"] = df["ALAM_KANTOR"] if "ALAM_KANTOR" in df.columns else df["ALAMAT_KANTOR"]
     out["Kontak Lembaga/Layanan"] = df["HOTLINE"].fillna(df["TELP_KANTOR"])
     out["Email Lembaga"] = ""
     out["Profil Organisasi"] = (
-        "UPTD PPA tingkat kabupaten/kota di "
-        + kab_clean
-        + ", Provinsi "
-        + prov_clean
+        "UPTD PPA tingkat kabupaten/kota di " + kab_clean + ", Provinsi " + prov_clean
     )
     out["Layanan Yang Diberikan"] = (
         "Layanan pengaduan; konseling psikologis; pendampingan hukum; rujukan layanan."
@@ -342,7 +338,7 @@ def load_uptd_kabkota() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_data() -> pd.DataFrame:
-    """Gabungkan FPL + UPTD PPA Provinsi + UPTD PPA Kab/Kota, plus kategori."""
+    """Gabungkan FPL + UPTD PPA Provinsi + UPTD PPA Kab/Kota, plus kategori layanan."""
     fpl = load_fpl()
     uptd_prov = load_uptd_prov()
     uptd_kab = load_uptd_kabkota()
@@ -378,82 +374,7 @@ def load_data() -> pd.DataFrame:
 
 
 # ============================================================
-# 3. GITHUB STORAGE FOR SUGGESTIONS
-# ============================================================
-def _github_conf_ok():
-    required_keys = ["GITHUB_TOKEN", "GITHUB_REPO"]
-    return all(k in st.secrets for k in required_keys)
-
-
-def _github_get_file():
-    """
-    Ambil file CSV dari GitHub, kembalikan (content_bytes, sha) atau (None, None).
-    """
-    if not _github_conf_ok():
-        return None, None
-
-    token = st.secrets["GITHUB_TOKEN"]
-    repo = st.secrets["GITHUB_REPO"]
-    path = st.secrets.get("GITHUB_FILE_PATH", "edit_suggestions.csv")
-    branch = st.secrets.get("GITHUB_BRANCH", "main")
-
-    url = f"https://api.github.com/repos/{repo}/contents/{path}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github+json",
-    }
-
-    resp = requests.get(url, headers=headers, params={"ref": branch})
-    if resp.status_code == 200:
-        data = resp.json()
-        content_b64 = data["content"]
-        sha = data["sha"]
-        content_bytes = base64.b64decode(content_b64)
-        return content_bytes, sha
-    elif resp.status_code == 404:
-        # belum ada file
-        return None, None
-    else:
-        st.warning(f"Gagal mengambil data usulan dari GitHub (status {resp.status_code}).")
-        return None, None
-
-
-def _github_put_file(content_bytes, sha):
-    """
-    Push konten CSV ke GitHub. Jika sha None → buat file baru, kalau tidak → update.
-    """
-    if not _github_conf_ok():
-        return
-
-    token = st.secrets["GITHUB_TOKEN"]
-    repo = st.secrets["GITHUB_REPO"]
-    path = st.secrets.get("GITHUB_FILE_PATH", "edit_suggestions.csv")
-    branch = st.secrets.get("GITHUB_BRANCH", "main")
-
-    url = f"https://api.github.com/repos/{repo}/contents/{path}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github+json",
-    }
-
-    b64_content = base64.b64encode(content_bytes).decode("utf-8")
-    commit_message = f"Update edit_suggestions.csv {datetime.datetime.utcnow().isoformat()}"
-
-    payload = {
-        "message": commit_message,
-        "content": b64_content,
-        "branch": branch,
-    }
-    if sha:
-        payload["sha"] = sha
-
-    resp = requests.put(url, headers=headers, json=payload)
-    if resp.status_code not in (200, 201):
-        st.warning(f"Gagal menyimpan usulan koreksi ke GitHub (status {resp.status_code}).")
-
-
-# ============================================================
-# 4. SUGGESTION DATA (KOREKSI)
+# 4. SUGGESTIONS (KOREKSI DATA) – LOCAL CSV ONLY
 # ============================================================
 def load_suggestions() -> pd.DataFrame:
     required_cols = [
@@ -470,28 +391,12 @@ def load_suggestions() -> pd.DataFrame:
         "processed_at",
     ]
 
-    df = None
-
-    # 1) Coba baca lokal
     if SUGGEST_PATH.exists():
         try:
             df = pd.read_csv(SUGGEST_PATH)
         except Exception:
-            df = None
-
-    # 2) Kalau gagal / tidak ada → coba dari GitHub
-    if df is None:
-        content_bytes, _ = _github_get_file()
-        if content_bytes is not None:
-            try:
-                s = content_bytes.decode("utf-8")
-                df = pd.read_csv(io.StringIO(s))
-                df.to_csv(SUGGEST_PATH, index=False)  # cache ke lokal
-            except Exception:
-                df = None
-
-    # 3) Kalau masih None → buat kosong
-    if df is None:
+            df = pd.DataFrame(columns=required_cols)
+    else:
         df = pd.DataFrame(columns=required_cols)
 
     for c in required_cols:
@@ -506,16 +411,7 @@ def load_suggestions() -> pd.DataFrame:
 
 
 def save_suggestions(df_sug: pd.DataFrame):
-    # Simpan ke lokal
     df_sug.to_csv(SUGGEST_PATH, index=False)
-
-    # Push ke GitHub
-    try:
-        _, sha = _github_get_file()
-        csv_bytes = df_sug.to_csv(index=False).encode("utf-8")
-        _github_put_file(csv_bytes, sha)
-    except Exception as e:
-        st.warning(f"Gagal sinkronisasi usulan koreksi ke GitHub: {e}")
 
 
 # ============================================================
@@ -529,17 +425,12 @@ if "koreksi_target_org" not in st.session_state:
     st.session_state["koreksi_target_org"] = None
 if "koreksi_hint" not in st.session_state:
     st.session_state["koreksi_hint"] = None
-
-# modal states
-if "show_detail_modal" not in st.session_state:
-    st.session_state["show_detail_modal"] = False
-if "detail_modal_org" not in st.session_state:
-    st.session_state["detail_modal_org"] = None
-
-if "show_koreksi_modal" not in st.session_state:
-    st.session_state["show_koreksi_modal"] = False
-if "koreksi_modal_org" not in st.session_state:
-    st.session_state["koreksi_modal_org"] = None
+if "jump_to_koreksi" not in st.session_state:
+    st.session_state["jump_to_koreksi"] = False
+if "show_detail" not in st.session_state:
+    st.session_state["show_detail"] = False
+if "detail_org" not in st.session_state:
+    st.session_state["detail_org"] = None
 
 # ============================================================
 # 6. HEADER
@@ -578,11 +469,13 @@ tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
 # TAB: DIREKTORI
 # ============================================================
 with tab_dir:
+    # anchor untuk header direktori
+    st.markdown('<a name="direktori-layanan"></a>', unsafe_allow_html=True)
     st.markdown("### 📊 Direktori Layanan")
 
     fcol1, fcol2 = st.columns([1, 3])
 
-    # ----- FILTER -----
+    # ---------- FILTER ----------
     with fcol1:
         st.markdown("#### 🔎 Filter")
         name = st.text_input("Cari Nama Organisasi")
@@ -596,21 +489,21 @@ with tab_dir:
             addr = ""
             selected_categories = []
             st.session_state["page"] = 1
-            st.session_state["show_detail_modal"] = False
-            st.session_state["detail_modal_org"] = None
-            st.session_state["show_koreksi_modal"] = False
-            st.session_state["koreksi_modal_org"] = None
+            st.session_state["show_detail"] = False
+            st.session_state["detail_org"] = None
+            st.session_state["koreksi_hint"] = None
+            st.session_state["jump_to_koreksi"] = False
             st.rerun()
 
     filtered = df.copy()
     if name:
-        filtered = filtered[filtered["Nama Organisasi"]
-                            .fillna("")
-                            .str.contains(name, case=False, na=False)]
+        filtered = filtered[
+            filtered["Nama Organisasi"].fillna("").str.contains(name, case=False, na=False)
+        ]
     if addr:
-        filtered = filtered[filtered["Alamat Organisasi"]
-                            .fillna("")
-                            .str.contains(addr, case=False, na=False)]
+        filtered = filtered[
+            filtered["Alamat Organisasi"].fillna("").str.contains(addr, case=False, na=False)
+        ]
 
     if selected_categories:
         def has_cat(lst):
@@ -620,7 +513,7 @@ with tab_dir:
     total_count = len(df)
     filtered_count = len(filtered)
 
-    # ----- PAGINATION -----
+    # ---------- PAGINATION ----------
     page_size = 10
     total_pages = max(1, math.ceil(max(filtered_count, 1) / page_size))
 
@@ -636,8 +529,8 @@ with tab_dir:
             with prev_col:
                 if st.button("◀", disabled=st.session_state["page"] <= 1):
                     st.session_state["page"] -= 1
-                    st.session_state["show_detail_modal"] = False
-                    st.session_state["detail_modal_org"] = None
+                    st.session_state["show_detail"] = False
+                    st.session_state["detail_org"] = None
                     st.rerun()
             with mid_col:
                 st.markdown(
@@ -648,11 +541,11 @@ with tab_dir:
             with next_col:
                 if st.button("▶", disabled=st.session_state["page"] >= total_pages):
                     st.session_state["page"] += 1
-                    st.session_state["show_detail_modal"] = False
-                    st.session_state["detail_modal_org"] = None
+                    st.session_state["show_detail"] = False
+                    st.session_state["detail_org"] = None
                     st.rerun()
 
-    # ----- CARD LIST -----
+    # ---------- CARD LIST ----------
     with fcol2:
         st.markdown(
             f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
@@ -727,36 +620,36 @@ with tab_dir:
 
                         bcol1, bcol2 = st.columns(2)
 
-                        # Tombol "Usulkan koreksi" → modal koreksi
+                        # Tombol usulan koreksi → set target + info link ke bawah
                         with bcol1:
                             if st.button(
                                 "✏️ Usulkan koreksi",
                                 key=f"suggest_{start_idx + idx_row}",
                                 use_container_width=True,
                             ):
-                                st.session_state["koreksi_modal_org"] = nama
-                                st.session_state["show_koreksi_modal"] = True
+                                st.session_state["koreksi_target_org"] = nama
                                 st.session_state["koreksi_hint"] = (
-                                    f"Lembaga **{nama}** juga sudah otomatis dipilih "
-                                    "di tab **Koreksi Data**."
+                                    f"Lembaga **{nama}** sudah otomatis dipilih di "
+                                    "bagian *Usulan Koreksi Cepat* di bawah. "
+                                    "Silakan scroll atau klik tautan ke form."
                                 )
+                                st.session_state["jump_to_koreksi"] = True
                                 st.rerun()
 
-                        # Tombol "Lihat detail" → modal detail
                         with bcol2:
                             if st.button(
                                 "👁 Lihat detail",
                                 key=f"detail_{start_idx + idx_row}",
                                 use_container_width=True,
                             ):
-                                st.session_state["detail_modal_org"] = nama
-                                st.session_state["show_detail_modal"] = True
+                                st.session_state["detail_org"] = nama
+                                st.session_state["show_detail"] = True
                                 st.rerun()
-        # ---------- DETAIL SECTION (tanpa st.modal) ----------
-        if st.session_state.get("show_detail_modal") and st.session_state.get("detail_modal_org"):
-            org_name = st.session_state["detail_modal_org"]
-            detail_df = df[df["Nama Organisasi"] == org_name]
 
+        # ---------- DETAIL SECTION (NON MODAL) ----------
+        if st.session_state.get("show_detail") and st.session_state.get("detail_org"):
+            org_name = st.session_state["detail_org"]
+            detail_df = df[df["Nama Organisasi"] == org_name]
             if not detail_df.empty:
                 r = detail_df.iloc[0]
                 sumber = safe_str(r.get("Sumber Data", ""))
@@ -764,7 +657,6 @@ with tab_dir:
 
                 st.markdown("---")
                 st.markdown("#### 👁 Profil Lembaga (Detail)")
-
                 st.markdown(
                     f"<div style='display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;'>"
                     f"<div><b>{safe_str(r.get('Nama Organisasi', ''))}</b></div>"
@@ -816,109 +708,26 @@ with tab_dir:
                     st.write("—")
 
                 if st.button("Tutup detail", key="close_detail_section"):
-                    st.session_state["show_detail_modal"] = False
-                    st.session_state["detail_modal_org"] = None
+                    st.session_state["show_detail"] = False
+                    st.session_state["detail_org"] = None
                     st.rerun()
 
-        
-        # ---------- SECTION: USULAN KOREKSI (tanpa st.modal) ----------
-        if st.session_state.get("show_koreksi_modal") and st.session_state.get("koreksi_modal_org"):
-            target_org = st.session_state["koreksi_modal_org"]
-
-            st.markdown("---")
-            st.markdown("#### ✏️ Usulan Koreksi Cepat")
-
+        # ---------- INFO LINK KE FORM CEPAT (JIKA BARU KLIK CARD) ----------
+        if st.session_state.get("jump_to_koreksi"):
             st.markdown(
-                f"Anda mengusulkan koreksi untuk lembaga:\n\n**{target_org}**"
+                """
+                <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
+                  ⬇️ Klik link ini untuk langsung ke form:
+                  <a href="https://renoldlim.streamlit.app/~/+/#usulan-koreksi-cepat">
+                    Usulan Koreksi Cepat
+                  </a>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
+            # jangan reset di sini, biar pesan tetap ada sampai user reload/scroll
 
-            suggestions_df = load_suggestions()
-
-            pengaju = st.text_input("Nama Anda (quick form)", key="quick_pengaju")
-            kontak = st.text_input("Kontak (email / WA)", key="quick_kontak")
-            kolom = st.multiselect(
-                "Bagian yang ingin diubah",
-                [
-                    "Alamat Organisasi",
-                    "Kontak Lembaga/Layanan",
-                    "Email Lembaga",
-                    "Layanan Yang Diberikan",
-                    "Profil Organisasi",
-                    "Koordinat (Latitude/Longitude)",
-                    "Lainnya",
-                ],
-                key="quick_kolom",
-            )
-
-            st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
-            lat_col, lon_col = st.columns(2)
-            with lat_col:
-                lat_val = st.text_input(
-                    "Latitude (contoh: -6.1767)", key="quick_lat"
-                )
-            with lon_col:
-                lon_val = st.text_input(
-                    "Longitude (contoh: 106.8305)", key="quick_lon"
-                )
-
-            usulan = st.text_area(
-                "Tuliskan data baru / koreksi yang diusulkan",
-                height=150,
-                key="quick_usulan",
-            )
-
-            c1, c2 = st.columns(2)
-            with c1:
-                submit_quick = st.button("Kirim Usulan", key="quick_submit")
-            with c2:
-                cancel_quick = st.button("Batal", key="quick_cancel")
-
-            if cancel_quick:
-                st.session_state["show_koreksi_modal"] = False
-                st.session_state["koreksi_modal_org"] = None
-                st.rerun()
-
-            if submit_quick:
-                if not usulan.strip() and not (lat_val.strip() and lon_val.strip()):
-                    st.warning(
-                        "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
-                    )
-                else:
-                    suggestions_df = load_suggestions()
-                    if suggestions_df.empty:
-                        new_id = 1
-                    else:
-                        new_id = int(suggestions_df["id"].max()) + 1
-
-                    new_row = {
-                        "id": int(new_id),
-                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "organisasi": target_org,
-                        "pengaju": pengaju,
-                        "kontak": kontak,
-                        "kolom": "; ".join(kolom) if kolom else "",
-                        "usulan": usulan.strip(),
-                        "lat": lat_val.strip(),
-                        "lon": lon_val.strip(),
-                        "status": "Pending",
-                        "processed_at": "",
-                    }
-                    suggestions_df = pd.concat(
-                        [suggestions_df, pd.DataFrame([new_row])],
-                        ignore_index=True,
-                    )
-                    save_suggestions(suggestions_df)
-
-                    st.success(
-                        "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                        "Admin akan meninjau sebelum mengubah data utama."
-                    )
-
-                    st.session_state["show_koreksi_modal"] = False
-                    st.session_state["koreksi_modal_org"] = None
-                    st.rerun()
-
-        # ----- TABLE + DOWNLOAD -----
+        # ---------- TABEL + DOWNLOAD ----------
         with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
             table_df = filtered.copy()
             cols_table = [
@@ -939,7 +748,9 @@ with tab_dir:
 
             if "kategori_layanan" in table_df.columns:
                 table_df["kategori_layanan"] = table_df["kategori_layanan"].apply(
-                    lambda x: ", ".join(x) if isinstance(x, (list, tuple)) else safe_str(x)
+                    lambda x: ", ".join(x)
+                    if isinstance(x, (list, tuple))
+                    else safe_str(x)
                 )
 
             table_df = table_df.rename(
@@ -964,8 +775,115 @@ with tab_dir:
                 mime="text/csv",
             )
 
+        # ---------- USULAN KOREKSI CEPAT (ANCHOR) ----------
+        st.markdown("---")
+        st.markdown('<a name="usulan-koreksi-cepat"></a>', unsafe_allow_html=True)
+        st.markdown("#### ✏️ Usulan Koreksi Cepat")
+
+        st.markdown(
+            """
+            Bagian ini untuk **koreksi cepat** dari card di atas.  
+            Jika Anda baru saja klik tombol *"Usulkan koreksi"* pada salah satu lembaga,
+            nama lembaga tersebut **sudah otomatis dipilih** di sini.
+            """
+        )
+
+        org_options_quick = sorted(df["Nama Organisasi"].dropna().unique())
+        default_org_q = st.session_state.get("koreksi_target_org")
+        if default_org_q in org_options_quick:
+            default_index_q = org_options_quick.index(default_org_q)
+        else:
+            default_index_q = 0 if org_options_quick else 0
+
+        suggestions_df_quick = load_suggestions()
+
+        with st.form("quick_suggest_form"):
+            org_name_q = st.selectbox(
+                "Pilih lembaga yang ingin dikoreksi",
+                org_options_quick,
+                index=default_index_q,
+            )
+            pengaju_q = st.text_input("Nama Anda")
+            kontak_q = st.text_input("Kontak (email / WA)")
+            kolom_q = st.multiselect(
+                "Bagian yang ingin diubah",
+                [
+                    "Alamat Organisasi",
+                    "Kontak Lembaga/Layanan",
+                    "Email Lembaga",
+                    "Layanan Yang Diberikan",
+                    "Profil Organisasi",
+                    "Koordinat (Latitude/Longitude)",
+                    "Lainnya",
+                ],
+            )
+
+            st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
+            lat_col_q, lon_col_q = st.columns(2)
+            with lat_col_q:
+                lat_val_q = st.text_input("Latitude (contoh: -6.1767)")
+            with lon_col_q:
+                lon_val_q = st.text_input("Longitude (contoh: 106.8305)")
+
+            usulan_q = st.text_area(
+                "Tuliskan data baru / koreksi yang diusulkan",
+                height=120,
+            )
+
+            submit_quick = st.form_submit_button("Kirim Usulan Koreksi Cepat")
+
+            if submit_quick:
+                if not usulan_q.strip() and not (lat_val_q.strip() and lon_val_q.strip()):
+                    st.warning(
+                        "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
+                    )
+                else:
+                    new_id = (
+                        1
+                        if suggestions_df_quick.empty
+                        else int(suggestions_df_quick["id"].max()) + 1
+                    )
+
+                    new_row = {
+                        "id": int(new_id),
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "organisasi": org_name_q,
+                        "pengaju": pengaju_q,
+                        "kontak": kontak_q,
+                        "kolom": "; ".join(kolom_q) if kolom_q else "",
+                        "usulan": usulan_q.strip(),
+                        "lat": lat_val_q.strip(),
+                        "lon": lon_val_q.strip(),
+                        "status": "Pending",
+                        "processed_at": "",
+                    }
+                    suggestions_df_quick = pd.concat(
+                        [suggestions_df_quick, pd.DataFrame([new_row])],
+                        ignore_index=True,
+                    )
+                    save_suggestions(suggestions_df_quick)
+
+                    st.session_state["koreksi_target_org"] = org_name_q
+                    st.success(
+                        "Terima kasih, usulan koreksi Anda sudah tercatat. "
+                        "Admin akan meninjau sebelum mengubah data utama."
+                    )
+
+        # ---------- GO UP BUTTON ----------
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style='text-align:right; margin-top:0.5rem;'>
+              <a href="https://renoldlim.streamlit.app/~/+/#direktori-layanan">
+                ⬆️ Kembali ke atas (Direktori Layanan)
+              </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
 # ============================================================
-# TAB: KOREKSI DATA
+# TAB: KOREKSI DATA (FORM LENGKAP)
 # ============================================================
 with tab_koreksi:
     st.markdown("### ✏️ Form Koreksi Data Lembaga")
@@ -1055,7 +973,7 @@ with tab_koreksi:
                     ignore_index=True,
                 )
                 save_suggestions(suggestions_df)
-                st.session_state["koreksi_hint"] = None
+                st.session_state["koreksi_target_org"] = org_name
                 st.success(
                     "Terima kasih, usulan koreksi Anda sudah tercatat. "
                     "Admin akan meninjau sebelum mengubah data utama."
