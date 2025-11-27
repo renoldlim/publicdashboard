@@ -223,12 +223,11 @@ def load_fpl() -> pd.DataFrame:
 
 
 def load_uptd_prov() -> pd.DataFrame:
-    if not UPTD_XLSX.exists():
+    raw = _read_excel_safe(UPTD_XLSX, sheet_name="UPTD PPA Provinsi")
+    if raw is None:
         return pd.DataFrame()
 
-    raw = pd.read_excel(UPTD_XLSX, sheet_name="UPTD PPA Provinsi", header=None)
     df = raw.iloc[3:].copy()
-
     df = df.rename(
         columns={
             0: "NO",
@@ -243,7 +242,7 @@ def load_uptd_prov() -> pd.DataFrame:
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^PROVINSI\\s+", "", regex=True)
+        .str.replace(r"^PROVINSI\s+", "", regex=True)
         .str.title()
     )
 
@@ -266,12 +265,11 @@ def load_uptd_prov() -> pd.DataFrame:
 
 
 def load_uptd_kabkota() -> pd.DataFrame:
-    if not UPTD_XLSX.exists():
+    raw = _read_excel_safe(UPTD_XLSX, sheet_name="UPTD PPA KabKota")
+    if raw is None:
         return pd.DataFrame()
 
-    raw = pd.read_excel(UPTD_XLSX, sheet_name="UPTD PPA KabKota", header=None)
     df = raw.iloc[3:].copy()
-
     df = df.rename(
         columns={
             0: "PROVINSI",
@@ -288,7 +286,7 @@ def load_uptd_kabkota() -> pd.DataFrame:
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^Provinsi\\s+", "", regex=True)
+        .str.replace(r"^Provinsi\s+", "", regex=True)
         .str.title()
     )
     kab_clean = df["KABKOTA"].astype(str).str.title()
