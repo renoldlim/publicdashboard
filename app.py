@@ -752,8 +752,7 @@ with tab_dir:
                                 st.session_state["detail_modal_org"] = nama
                                 st.session_state["show_detail_modal"] = True
                                 st.rerun()
-
-        # ---------- MODAL: LIHAT DETAIL ----------
+        # ---------- DETAIL SECTION (tanpa st.modal) ----------
         if st.session_state.get("show_detail_modal") and st.session_state.get("detail_modal_org"):
             org_name = st.session_state["detail_modal_org"]
             detail_df = df[df["Nama Organisasi"] == org_name]
@@ -763,156 +762,161 @@ with tab_dir:
                 sumber = safe_str(r.get("Sumber Data", ""))
                 badge_html = get_source_badge_html(sumber)
 
-                with st.modal("Profil Lembaga"):
-                    st.markdown(
-                        f"<div style='display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;'>"
-                        f"<div><b>{safe_str(r.get('Nama Organisasi', ''))}</b></div>"
-                        f"<div>{badge_html}</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
+                st.markdown("---")
+                st.markdown("#### 👁 Profil Lembaga (Detail)")
 
-                    col_a, col_b = st.columns([2, 1])
-                    with col_a:
-                        st.markdown("**Alamat**")
-                        st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
+                st.markdown(
+                    f"<div style='display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;'>"
+                    f"<div><b>{safe_str(r.get('Nama Organisasi', ''))}</b></div>"
+                    f"<div>{badge_html}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
 
-                        st.markdown("**Kontak Layanan**")
-                        st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
+                col_a, col_b = st.columns([2, 1])
+                with col_a:
+                    st.markdown("**Alamat**")
+                    st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
 
-                        st.markdown("**Email Layanan**")
-                        st.write(safe_str(r.get("Email Lembaga", "")) or "—")
+                    st.markdown("**Kontak Layanan**")
+                    st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
 
-                        st.markdown("**Profil Organisasi**")
-                        st.write(safe_str(r.get("Profil Organisasi", "")) or "—")
+                    st.markdown("**Email Layanan**")
+                    st.write(safe_str(r.get("Email Lembaga", "")) or "—")
 
-                    with col_b:
-                        st.markdown("**Koordinat Lokasi**")
-                        lat = safe_str(r.get("Latitude", ""))
-                        lon = safe_str(r.get("Longitude", ""))
-                        if lat and lon:
-                            st.write(f"Lat: `{lat}`, Lon: `{lon}`")
-                        else:
-                            st.write(
-                                "Belum ada koordinat latitude/longitude. "
-                                "Dapat diusulkan melalui koreksi data."
-                            )
+                    st.markdown("**Profil Organisasi**")
+                    st.write(safe_str(r.get("Profil Organisasi", "")) or "—")
 
-                        st.markdown("**Kategori Layanan**")
-                        kat = r.get("kategori_layanan", [])
-                        if isinstance(kat, (list, tuple)) and kat:
-                            for c in kat:
-                                st.markdown(f"- {c}")
-                        else:
-                            st.write("—")
+                with col_b:
+                    st.markdown("**Koordinat Lokasi**")
+                    lat = safe_str(r.get("Latitude", ""))
+                    lon = safe_str(r.get("Longitude", ""))
+                    if lat and lon:
+                        st.write(f"Lat: `{lat}`, Lon: `{lon}`")
+                    else:
+                        st.write(
+                            "Belum ada koordinat latitude/longitude. "
+                            "Dapat diusulkan melalui koreksi data."
+                        )
 
-                    st.markdown("**Layanan yang diberikan**")
-                    layanan_list = r.get("layanan_list", [])
-                    if isinstance(layanan_list, (list, tuple)) and layanan_list:
-                        for item in layanan_list:
-                            st.write(f"- {safe_str(item)}")
+                    st.markdown("**Kategori Layanan**")
+                    kat = r.get("kategori_layanan", [])
+                    if isinstance(kat, (list, tuple)) and kat:
+                        for c in kat:
+                            st.markdown(f"- {c}")
                     else:
                         st.write("—")
 
-                    if st.button("Tutup", key="close_detail_modal"):
-                        st.session_state["show_detail_modal"] = False
-                        st.session_state["detail_modal_org"] = None
-                        st.rerun()
+                st.markdown("**Layanan yang diberikan**")
+                layanan_list = r.get("layanan_list", [])
+                if isinstance(layanan_list, (list, tuple)) and layanan_list:
+                    for item in layanan_list:
+                        st.write(f"- {safe_str(item)}")
+                else:
+                    st.write("—")
 
-        # ---------- MODAL: USULAN KOREKSI ----------
+                if st.button("Tutup detail", key="close_detail_section"):
+                    st.session_state["show_detail_modal"] = False
+                    st.session_state["detail_modal_org"] = None
+                    st.rerun()
+
+        
+        # ---------- SECTION: USULAN KOREKSI (tanpa st.modal) ----------
         if st.session_state.get("show_koreksi_modal") and st.session_state.get("koreksi_modal_org"):
             target_org = st.session_state["koreksi_modal_org"]
 
-            with st.modal("Usulkan Koreksi Data"):
-                st.markdown(
-                    f"Anda mengusulkan koreksi untuk lembaga:\n\n**{target_org}**"
+            st.markdown("---")
+            st.markdown("#### ✏️ Usulan Koreksi Cepat")
+
+            st.markdown(
+                f"Anda mengusulkan koreksi untuk lembaga:\n\n**{target_org}**"
+            )
+
+            suggestions_df = load_suggestions()
+
+            pengaju = st.text_input("Nama Anda (quick form)", key="quick_pengaju")
+            kontak = st.text_input("Kontak (email / WA)", key="quick_kontak")
+            kolom = st.multiselect(
+                "Bagian yang ingin diubah",
+                [
+                    "Alamat Organisasi",
+                    "Kontak Lembaga/Layanan",
+                    "Email Lembaga",
+                    "Layanan Yang Diberikan",
+                    "Profil Organisasi",
+                    "Koordinat (Latitude/Longitude)",
+                    "Lainnya",
+                ],
+                key="quick_kolom",
+            )
+
+            st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
+            lat_col, lon_col = st.columns(2)
+            with lat_col:
+                lat_val = st.text_input(
+                    "Latitude (contoh: -6.1767)", key="quick_lat"
+                )
+            with lon_col:
+                lon_val = st.text_input(
+                    "Longitude (contoh: 106.8305)", key="quick_lon"
                 )
 
-                suggestions_df = load_suggestions()
+            usulan = st.text_area(
+                "Tuliskan data baru / koreksi yang diusulkan",
+                height=150,
+                key="quick_usulan",
+            )
 
-                pengaju = st.text_input("Nama Anda", key="modal_pengaju")
-                kontak = st.text_input("Kontak (email / WA)", key="modal_kontak")
-                kolom = st.multiselect(
-                    "Bagian yang ingin diubah",
-                    [
-                        "Alamat Organisasi",
-                        "Kontak Lembaga/Layanan",
-                        "Email Lembaga",
-                        "Layanan Yang Diberikan",
-                        "Profil Organisasi",
-                        "Koordinat (Latitude/Longitude)",
-                        "Lainnya",
-                    ],
-                    key="modal_kolom",
-                )
+            c1, c2 = st.columns(2)
+            with c1:
+                submit_quick = st.button("Kirim Usulan", key="quick_submit")
+            with c2:
+                cancel_quick = st.button("Batal", key="quick_cancel")
 
-                st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
-                lat_col, lon_col = st.columns(2)
-                with lat_col:
-                    lat_val = st.text_input(
-                        "Latitude (contoh: -6.1767)", key="modal_lat"
+            if cancel_quick:
+                st.session_state["show_koreksi_modal"] = False
+                st.session_state["koreksi_modal_org"] = None
+                st.rerun()
+
+            if submit_quick:
+                if not usulan.strip() and not (lat_val.strip() and lon_val.strip()):
+                    st.warning(
+                        "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
                     )
-                with lon_col:
-                    lon_val = st.text_input(
-                        "Longitude (contoh: 106.8305)", key="modal_lon"
+                else:
+                    suggestions_df = load_suggestions()
+                    if suggestions_df.empty:
+                        new_id = 1
+                    else:
+                        new_id = int(suggestions_df["id"].max()) + 1
+
+                    new_row = {
+                        "id": int(new_id),
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "organisasi": target_org,
+                        "pengaju": pengaju,
+                        "kontak": kontak,
+                        "kolom": "; ".join(kolom) if kolom else "",
+                        "usulan": usulan.strip(),
+                        "lat": lat_val.strip(),
+                        "lon": lon_val.strip(),
+                        "status": "Pending",
+                        "processed_at": "",
+                    }
+                    suggestions_df = pd.concat(
+                        [suggestions_df, pd.DataFrame([new_row])],
+                        ignore_index=True,
+                    )
+                    save_suggestions(suggestions_df)
+
+                    st.success(
+                        "Terima kasih, usulan koreksi Anda sudah tercatat. "
+                        "Admin akan meninjau sebelum mengubah data utama."
                     )
 
-                usulan = st.text_area(
-                    "Tuliskan data baru / koreksi yang diusulkan",
-                    height=150,
-                    key="modal_usulan",
-                )
-
-                c1, c2 = st.columns(2)
-                with c1:
-                    submit_modal = st.button("Kirim Usulan", key="modal_submit")
-                with c2:
-                    cancel_modal = st.button("Batal", key="modal_cancel")
-
-                if cancel_modal:
                     st.session_state["show_koreksi_modal"] = False
                     st.session_state["koreksi_modal_org"] = None
                     st.rerun()
-
-                if submit_modal:
-                    if not usulan.strip() and not (lat_val.strip() and lon_val.strip()):
-                        st.warning(
-                            "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
-                        )
-                    else:
-                        suggestions_df = load_suggestions()
-                        if suggestions_df.empty:
-                            new_id = 1
-                        else:
-                            new_id = int(suggestions_df["id"].max()) + 1
-
-                        new_row = {
-                            "id": int(new_id),
-                            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                            "organisasi": target_org,
-                            "pengaju": pengaju,
-                            "kontak": kontak,
-                            "kolom": "; ".join(kolom) if kolom else "",
-                            "usulan": usulan.strip(),
-                            "lat": lat_val.strip(),
-                            "lon": lon_val.strip(),
-                            "status": "Pending",
-                            "processed_at": "",
-                        }
-                        suggestions_df = pd.concat(
-                            [suggestions_df, pd.DataFrame([new_row])],
-                            ignore_index=True,
-                        )
-                        save_suggestions(suggestions_df)
-
-                        st.success(
-                            "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                            "Admin akan meninjau sebelum mengubah data utama."
-                        )
-
-                        st.session_state["show_koreksi_modal"] = False
-                        st.session_state["koreksi_modal_org"] = None
-                        st.rerun()
 
         # ----- TABLE + DOWNLOAD -----
         with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
