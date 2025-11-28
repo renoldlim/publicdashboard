@@ -437,7 +437,7 @@ if "detail_org" not in st.session_state:
 logo_col, title_col = st.columns([1, 4])
 with logo_col:
     if FPL_LOGO_PATH.exists():
-        st.image(FPL_LOGO_PATH, width=200)
+        st.image(FPL_LOGO_PATH, width=250)
     else:
         st.markdown("📊")
 
