@@ -24,121 +24,117 @@ FPL_LOGO_PATH = BASE_DIR / "fpl_logo.png"  # opsional, abaikan jika belum ada fi
 # ============================================================
 # 1. HELPER FUNCTIONS & STYLES
 # ============================================================
-def safe_str(val) -> str:
-    """Konversi nilai (termasuk NaN/None/float) ke string aman."""
-    if val is None:
+def inject_css():
+    st.markdown(
+        """
+        <style>
+            .main-container {
+                padding-top: 1.5rem;
+                padding-bottom: 2.5rem;
+            }
+            .sidebar-content {
+                padding-top: 1rem;
+            }
+            .stTabs [data-baseweb="tab-panel"] {
+                padding-top: 1rem;
+            }
+            .org-card {
+                padding: 0.9rem 1.1rem;
+                margin-bottom: 0.9rem;
+                border-radius: 0.9rem;
+                border: 1px solid #e5e7eb;
+                background-color: #ffffff;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            }
+            .org-name {
+                font-weight: 600;
+                font-size: 1rem;
+                color: #111827;
+                margin-bottom: 0.15rem;
+            }
+            .org-address {
+                font-size: 0.90rem;
+                color: #374151;
+                margin-bottom: 0.35rem;
+            }
+            .org-meta {
+                font-size: 0.85rem;
+                color: #4b5563;
+                margin-bottom: 0.1rem;
+            }
+            .org-meta span.label {
+                font-weight: 600;
+                color: #111827;
+            }
+            .badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.25rem;
+                padding: 0.15rem 0.5rem;
+                border-radius: 999px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                border: 1px solid rgba(37, 99, 235, 0.2);
+                color: #1d4ed8;
+                background-color: #eff6ff;
+                white-space: nowrap;
+            }
+            .tag {
+                display: inline-block;
+                margin: 0.12rem 0.18rem 0.12rem 0;
+                padding: 0.12rem 0.48rem;
+                border-radius: 999px;
+                background-color: #f3f4f6;
+                color: #374151;
+                font-size: 0.78rem;
+            }
+            .tag.kategori {
+                background-color: #ecfeff;
+                color: #0f766e;
+            }
+            .tag.source {
+                background-color: #eef2ff;
+                color: #3730a3;
+            }
+            .tag.small {
+                font-size: 0.72rem;
+                padding: 0.08rem 0.4rem;
+            }
+            .detail-box {
+                padding: 0.9rem 1rem;
+                margin-top: 0.4rem;
+                border-radius: 0.75rem;
+                background-color: #f9fafb;
+                border: 1px solid #e5e7eb;
+            }
+            .detail-title {
+                font-weight: 600;
+                margin-bottom: 0.25rem;
+            }
+            .section-label {
+                font-size: 0.78rem;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                font-weight: 600;
+                color: #6b7280;
+            }
+            .small-link {
+                font-size: 0.8rem;
+                color: #2563eb !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_css()
+
+
+def safe_str(x) -> str:
+    if pd.isna(x):
         return ""
-    try:
-        if pd.isna(val):
-            return ""
-    except Exception:
-        pass
-    return str(val).strip()
-
-
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: #f9fafb;
-    }
-    .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2.5rem;
-    }
-    .sidebar-content {
-        padding-top: 1rem;
-    }
-    .stTabs [data-baseweb="tab-panel"] {
-        padding-top: 1rem;
-    }
-    .org-card {
-        padding: 0.9rem 1.1rem;
-        margin-bottom: 0.9rem;
-        border-radius: 0.9rem;
-        border: 1px solid #e5e7eb;
-        background-color: #ffffff;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-    }
-    .org-name {
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 0.15rem;
-        color: #111827;
-    }
-    .org-address {
-        font-size: 0.9rem;
-        color: #4b5563;
-        margin-bottom: 0.35rem;
-    }
-    .org-meta {
-        font-size: 0.86rem;
-        color: #374151;
-        margin-bottom: 0.15rem;
-    }
-    .org-meta span.label {
-        font-weight: 600;
-        color: #6b7280;
-    }
-    .tag {
-        display: inline-block;
-        padding: 0.15rem 0.6rem;
-        margin: 0 0.25rem 0.25rem 0;
-        border-radius: 999px;
-        font-size: 0.76rem;
-        background-color: #eef2ff;
-        color: #3730a3;
-        border: 1px solid #c7d2fe;
-        white-space: nowrap;
-    }
-    .source-badge {
-        font-size: 0.72rem;
-        padding: 0.1rem 0.55rem;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        white-space: nowrap;
-    }
-    .source-fpl {
-        background-color: #f5f3ff;
-        color: #5b21b6;
-        border-color: #ddd6fe;
-    }
-    .source-prov {
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        border-color: #bfdbfe;
-    }
-    .source-kab {
-        background-color: #ecfdf5;
-        color: #047857;
-        border-color: #bbf7d0;
-    }
-    .source-other {
-        background-color: #f3f4f6;
-        color: #4b5563;
-        border-color: #d1d5db;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-def get_source_badge_html(source_raw: str) -> str:
-    """Badge kecil berwarna sesuai sumber data."""
-    source = safe_str(source_raw) or "Tidak diketahui"
-    s = source.lower()
-
-    if "fpl" in s:
-        css_class = "source-badge source-fpl"
-    elif "provinsi" in s:
-        css_class = "source-badge source-prov"
-    elif "kab/kota" in s or "kabupaten" in s or "kab." in s or "kota" in s:
-        css_class = "source-badge source-kab"
-    else:
-        css_class = "source-badge source-other"
-
-    return f'<span class="{css_class}">{source}</span>'
+    return str(x)
 
 
 # ============================================================
@@ -172,8 +168,10 @@ def _extract_kategori(text: str) -> list[str]:
     for kat, keywords in KATEGORI_DEFS.items():
         if not keywords:
             continue
-        if any(kw in text_l for kw in keywords):
-            hasil.add(kat)
+        for kw in keywords:
+            if kw in text_l:
+                hasil.add(kat)
+                break
     if not hasil:
         hasil.add("Lainnya")
     return sorted(hasil)
@@ -195,8 +193,8 @@ def _read_excel_safe(path: Path, sheet_name: str):
         )
     except ImportError:
         st.warning(
-            f"Tidak dapat membaca '{path.name}' (openpyxl belum diinstall). "
-            "Data UPTD akan dilewati sampai dependensi terpasang."
+            "Package 'openpyxl' belum terpasang di environment. "
+            f"Sheet '{sheet_name}' dari '{path.name}' tidak dapat dibaca."
         )
         return None
     except Exception as e:
@@ -231,6 +229,8 @@ def load_fpl() -> pd.DataFrame:
         "Email Lembaga",
         "Profil Organisasi",
         "Layanan Yang Diberikan",
+        "Provinsi",
+        "Kab/Kota",
     ]:
         if col not in df.columns:
             df[col] = ""
@@ -246,6 +246,8 @@ def load_fpl() -> pd.DataFrame:
             "Sumber Data",
             "Latitude",
             "Longitude",
+            "Provinsi",
+            "Kab/Kota",
         ]
     ]
 
@@ -270,7 +272,7 @@ def load_uptd_prov() -> pd.DataFrame:
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^PROVINSI\\s+", "", regex=True)
+        .str.replace(r"^PROVINSI\s+", "", regex=True)
         .str.title()
     )
 
@@ -286,6 +288,8 @@ def load_uptd_prov() -> pd.DataFrame:
         "Layanan pengaduan; konseling psikologis; pendampingan hukum; rujukan layanan."
     )
     out["Sumber Data"] = "UPTD PPA Provinsi"
+    out["Provinsi"] = prov_clean
+    out["Kab/Kota"] = ""
     out["Latitude"] = np.nan
     out["Longitude"] = np.nan
 
@@ -293,14 +297,15 @@ def load_uptd_prov() -> pd.DataFrame:
 
 
 def load_uptd_kabkota() -> pd.DataFrame:
-    raw = _read_excel_safe(UPTD_XLSX, sheet_name="UPTD PPA KabKota")
+    raw = _read_excel_safe(UPTD_XLSX, sheet_name="UPTD PPA Kabkota")
     if raw is None:
         return pd.DataFrame()
 
-    df = raw.iloc[3:].copy()
+    df = raw.iloc[4:].copy()
     df = df.rename(
         columns={
-            0: "PROVINSI",
+            0: "NO",
+            1: "PROVINSI",
             2: "KABKOTA",
             4: "ALAMAT_KANTOR",
             5: "TELP_KANTOR",
@@ -314,7 +319,7 @@ def load_uptd_kabkota() -> pd.DataFrame:
     prov_clean = (
         df["PROVINSI"]
         .astype(str)
-        .str.replace(r"^Provinsi\\s+", "", regex=True)
+        .str.replace(r"^Provinsi\s+", "", regex=True)
         .str.title()
     )
     kab_clean = df["KABKOTA"].astype(str).str.title()
@@ -331,6 +336,8 @@ def load_uptd_kabkota() -> pd.DataFrame:
         "Layanan pengaduan; konseling psikologis; pendampingan hukum; rujukan layanan."
     )
     out["Sumber Data"] = "UPTD PPA Kab/Kota"
+    out["Provinsi"] = prov_clean
+    out["Kab/Kota"] = kab_clean
     out["Latitude"] = np.nan
     out["Longitude"] = np.nan
 
@@ -374,6 +381,83 @@ def load_data() -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
+def build_lokasi_uptd_fpl(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Bentuk rekap per provinsi/kabupaten/kota:
+    - berapa lembaga berjenis UPTD PPA (berdasarkan kolom 'Sumber Data')
+    - berapa lembaga jaringan FPL
+    - kategori lokasi: 'UPTD & FPL', 'Hanya UPTD', 'Hanya FPL'
+    """
+
+    if df is None or df.empty:
+        return pd.DataFrame(
+            columns=[
+                "Provinsi",
+                "Kab/Kota",
+                "jml_lembaga",
+                "jml_uptd",
+                "jml_fpl",
+                "Kategori Lokasi",
+            ]
+        )
+
+    data = df.copy()
+
+    # Pastikan kolom lokasi ada
+    for col in ["Provinsi", "Kab/Kota"]:
+        if col not in data.columns:
+            data[col] = ""
+
+    data["Provinsi_norm"] = data["Provinsi"].astype(str).str.strip().str.title()
+    data["KabKota_norm"] = data["Kab/Kota"].astype(str).str.strip().str.title()
+
+    # Hanya ambil baris yang punya nama kab/kota
+    loc = data[data["KabKota_norm"] != ""].copy()
+
+    loc["is_uptd"] = loc["Sumber Data"].astype(str).str.contains(
+        "UPTD", case=False, na=False
+    )
+    loc["is_fpl"] = loc["Sumber Data"].astype(str).str.contains(
+        "FPL", case=False, na=False
+    )
+
+    if "Nama Organisasi" in loc.columns:
+        count_col = "Nama Organisasi"
+    else:
+        count_col = loc.columns[0]
+
+    agg = (
+        loc.groupby(["Provinsi_norm", "KabKota_norm"], dropna=False)
+        .agg(
+            jml_lembaga=(count_col, "count"),
+            jml_uptd=("is_uptd", "sum"),
+            jml_fpl=("is_fpl", "sum"),
+        )
+        .reset_index()
+    )
+
+    agg["has_uptd"] = agg["jml_uptd"] > 0
+    agg["has_fpl"] = agg["jml_fpl"] > 0
+
+    conditions = [
+        agg["has_uptd"] & agg["has_fpl"],
+        agg["has_uptd"] & ~agg["has_fpl"],
+        ~agg["has_uptd"] & agg["has_fpl"],
+    ]
+    choices = ["UPTD & FPL", "Hanya UPTD", "Hanya FPL"]
+
+    agg["Kategori Lokasi"] = np.select(
+        conditions, choices, default="Belum terpetakan"
+    )
+
+    agg = agg.rename(
+        columns={"Provinsi_norm": "Provinsi", "KabKota_norm": "Kab/Kota"}
+    )
+
+    return agg
+
+
 # ============================================================
 # 4. SUGGESTIONS (KOREKSI DATA) – LOCAL CSV ONLY
 # ============================================================
@@ -386,29 +470,25 @@ def load_suggestions() -> pd.DataFrame:
         "kontak",
         "kolom",
         "usulan",
-        "lat",
-        "lon",
+        "catatan_internal",
         "status",
-        "processed_at",
     ]
+    if not SUGGEST_PATH.exists():
+        return pd.DataFrame(columns=required_cols)
 
-    if SUGGEST_PATH.exists():
-        try:
-            df = pd.read_csv(SUGGEST_PATH)
-        except Exception:
-            df = pd.DataFrame(columns=required_cols)
-    else:
-        df = pd.DataFrame(columns=required_cols)
+    try:
+        df = pd.read_csv(SUGGEST_PATH)
+    except Exception:
+        return pd.DataFrame(columns=required_cols)
 
-    for c in required_cols:
-        if c not in df.columns:
-            df[c] = ""
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = ""
 
-    df["id"] = pd.to_numeric(df.get("id"), errors="coerce")
-    if df["id"].isna().any():
+    df = df[required_cols]
+    if df["id"].isna().all():
         df["id"] = range(1, len(df) + 1)
-
-    return df[required_cols]
+    return df
 
 
 def save_suggestions(df_sug: pd.DataFrame):
@@ -419,6 +499,7 @@ def save_suggestions(df_sug: pd.DataFrame):
 # 5. INIT STATE & LOAD DF
 # ============================================================
 df = load_data()
+lokasi_uptd_fpl = build_lokasi_uptd_fpl(df)
 
 if "page" not in st.session_state:
     st.session_state["page"] = 1
@@ -454,15 +535,11 @@ with title_col:
 
 st.divider()
 
-# Info setelah klik "Usulkan koreksi"
-if st.session_state.get("koreksi_hint"):
-    st.info(st.session_state["koreksi_hint"])
-
 # ============================================================
 # 7. TABS
 # ============================================================
-tab_dir, tab_koreksi, tab_admin, tab_about = st.tabs(
-    ["📊 Direktori", "✏️ Koreksi Data", "🗂️ Admin", "ℹ️ Tentang"]
+tab_dir, tab_sanding, tab_koreksi, tab_admin, tab_about = st.tabs(
+    ["📊 Direktori", "🔁 Sandingkan Lokasi", "✏️ Koreksi Data", "🗂️ Admin", "ℹ️ Tentang"]
 )
 
 # ============================================================
@@ -480,44 +557,50 @@ with tab_dir:
         unsafe_allow_html=True,
     )
 
-    fcol1, fcol2 = st.columns([1, 3])
+    st.markdown(
+        "Cari lembaga layanan yang bekerja mendukung pemenuhan hak dan "
+        "perlindungan korban kekerasan berbasis perempuan dan anak."
+    )
 
     # ---------- FILTER ----------
+    fcol1, fcol2 = st.columns([3, 2])
     with fcol1:
-        st.markdown("#### 🔎 Filter")
-        name = st.text_input("Cari Nama Organisasi")
-        addr = st.text_input("Cari Alamat / Daerah")
+        name = st.text_input("Cari Nama Organisasi", "")
+        addr = st.text_input("Cari Alamat / Daerah", "")
 
-        all_categories = sorted({c for cats in df["kategori_layanan"] for c in cats})
-        selected_categories = st.multiselect("Kategori Layanan", all_categories)
-
-        if st.button("Reset filter", use_container_width=True):
-            name = ""
-            addr = ""
-            selected_categories = []
-            st.session_state["page"] = 1
-            st.session_state["show_detail"] = False
-            st.session_state["detail_org"] = None
-            st.session_state["koreksi_hint"] = None
-            st.rerun()
+    with fcol2:
+        # Pilih kategori layanan (multi select)
+        all_categories = sorted(KATEGORI_DEFS.keys())
+        selected_categories = st.multiselect(
+            "Filter kategori layanan (opsional)", all_categories
+        )
 
     filtered = df.copy()
+
     if name:
         filtered = filtered[
-            filtered["Nama Organisasi"].fillna("").str.contains(name, case=False, na=False)
+            filtered["Nama Organisasi"]
+            .fillna("")
+            .str.contains(name, case=False, na=False)
         ]
     if addr:
         filtered = filtered[
-            filtered["Alamat Organisasi"].fillna("").str.contains(addr, case=False, na=False)
+            filtered["Alamat Organisasi"]
+            .fillna("")
+            .str.contains(addr, case=False, na=False)
         ]
 
     if selected_categories:
+
         def has_cat(lst):
             return any(c in lst for c in selected_categories)
+
         filtered = filtered[filtered["kategori_layanan"].apply(has_cat)]
 
     total_count = len(df)
     filtered_count = len(filtered)
+
+    st.caption(f"Menampilkan {filtered_count} dari {total_count} lembaga")
 
     # ---------- PAGINATION ----------
     page_size = 10
@@ -535,173 +618,138 @@ with tab_dir:
             with prev_col:
                 if st.button("◀", disabled=st.session_state["page"] <= 1):
                     st.session_state["page"] -= 1
-                    st.session_state["show_detail"] = False
-                    st.session_state["detail_org"] = None
-                    st.rerun()
             with mid_col:
                 st.markdown(
-                    f"<div style='text-align:center; padding-top:4px;'>Halaman "
-                    f"<b>{st.session_state['page']}</b> dari {total_pages}</div>",
+                    f"<div style='text-align:center; margin-top:0.35rem;'>"
+                    f"Halaman {st.session_state['page']} dari {total_pages}"
+                    f"</div>",
                     unsafe_allow_html=True,
                 )
             with next_col:
                 if st.button("▶", disabled=st.session_state["page"] >= total_pages):
                     st.session_state["page"] += 1
+
+    start_idx = (st.session_state["page"] - 1) * page_size
+    end_idx = start_idx + page_size
+    page_df = filtered.iloc[start_idx:end_idx].copy()
+
+    # ---------- LISTING CARD ----------
+    if filtered_count == 0:
+        st.info("Belum ada lembaga yang cocok dengan filter pencarian.")
+    else:
+        for idx_row, row in page_df.iterrows():
+            nama = safe_str(row.get("Nama Organisasi", ""))
+            alamat = safe_str(row.get("Alamat Organisasi", ""))
+            kontak = safe_str(row.get("Kontak Lembaga/Layanan", ""))
+            email = safe_str(row.get("Email Lembaga", ""))
+            sumber = safe_str(row.get("Sumber Data", ""))
+            layanan_list = row.get("layanan_list", [])
+            kategori_layanan = row.get("kategori_layanan", [])
+
+            # Badge utama
+            badge_html = ""
+            if "UPTD" in sumber.upper():
+                badge_html = (
+                    "<span class='badge'>UPTD PPA "
+                    "(data KemenPPPA)</span>"
+                )
+            elif "FPL" in sumber.upper():
+                badge_html = (
+                    "<span class='badge'>Jaringan FPL</span>"
+                )
+
+            # Tags kategori layanan
+            tags_html = ""
+            if isinstance(kategori_layanan, (list, tuple)):
+                for kat in kategori_layanan:
+                    tags_html += (
+                        f"<span class='tag kategori'>{kat}</span>"
+                    )
+
+            if sumber:
+                tags_html += (
+                    f"<span class='tag source'>"
+                    f"{sumber}</span>"
+                )
+
+            alamat_disp = alamat if alamat else "—"
+
+            card_html = f"""
+                <div class="org-card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+                        <div class="org-name">{nama}</div>
+                        <div>{badge_html}</div>
+                    </div>
+                    <div class="org-address">{alamat_disp}</div>
+                    <div class="org-meta">
+                        <span class="label">Service Contact:</span>
+                        {'-' if not kontak else kontak}
+                    </div>
+                    <div class="org-meta">
+                        <span class="label">Service Email:</span>
+                        {'-' if not email else email}
+                    </div>
+                    <div class="org-meta">
+                        <span class="label">Service Categories:</span><br/>
+                        {tags_html if tags_html else '<span class="tag">Not specified</span>'}
+                    </div>
+                </div>
+                """
+            st.markdown(card_html, unsafe_allow_html=True)
+
+            bcol1, bcol2 = st.columns(2)
+
+            # Tombol usulan koreksi → simpan target + pesan dengan link ke anchor form
+            with bcol1:
+                if st.button(
+                    "✏️ Usulkan koreksi",
+                    key=f"suggest_{start_idx + idx_row}",
+                    use_container_width=True,
+                ):
+                    st.session_state["koreksi_target_org"] = nama
+                    st.session_state[
+                        "koreksi_hint"
+                    ] = f"Saya ingin mengoreksi data lembaga: {nama}"
+                    st.session_state["page"] = st.session_state["page"]
                     st.session_state["show_detail"] = False
                     st.session_state["detail_org"] = None
-                    st.rerun()
+                    st.toast(
+                        "Silakan buka tab **Koreksi Data** di atas "
+                        "untuk melengkapi formulir koreksi.",
+                        icon="✏️",
+                    )
 
-    # ---------- CARD LIST ----------
-    with fcol2:
-        st.markdown(
-            f"Menampilkan **{filtered_count}** dari **{total_count}** lembaga"
-        )
-        st.markdown("---")
+            # Tombol detail lembaga
+            with bcol2:
+                if st.button(
+                    "ℹ️ Lihat detail lembaga",
+                    key=f"detail_{start_idx + idx_row}",
+                    use_container_width=True,
+                ):
+                    st.session_state["show_detail"] = True
+                    st.session_state["detail_org"] = nama
 
-        if filtered_count == 0:
-            st.info("Belum ada lembaga yang cocok dengan filter.")
-        else:
-            cards_df = filtered.reset_index(drop=True)
-            page = st.session_state["page"]
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            page_df = cards_df.iloc[start_idx:end_idx]
+            # Jika lembaga ini sedang ditampilkan detailnya
+            if (
+                st.session_state.get("show_detail")
+                and st.session_state.get("detail_org") == nama
+            ):
+                # Cari ulang row lengkap dari df gabungan
+                r = df[df["Nama Organisasi"] == nama].iloc[0].to_dict()
 
-            st.caption(
-                f"Menampilkan lembaga nomor {start_idx+1}–"
-                f"{min(end_idx, len(cards_df))} dari {len(cards_df)} hasil."
-            )
-
-            n_cols = 2 if len(page_df) > 1 else 1
-
-            for i in range(0, len(page_df), n_cols):
-                cols = st.columns(n_cols)
-                chunk = page_df.iloc[i:i + n_cols]
-
-                for col, (idx_row, row) in zip(cols, chunk.iterrows()):
-                    with col:
-                        nama = safe_str(row.get("Nama Organisasi", ""))
-                        alamat = safe_str(row.get("Alamat Organisasi", ""))
-                        kontak = safe_str(row.get("Kontak Lembaga/Layanan", ""))
-                        email = safe_str(row.get("Email Lembaga", ""))
-                        kategori = row.get("kategori_layanan", [])
-                        sumber = safe_str(row.get("Sumber Data", ""))
-
-                        if isinstance(kategori, str):
-                            kategori_list = [
-                                k.strip() for k in kategori.split(",") if k.strip()
-                            ]
-                        else:
-                            kategori_list = kategori or []
-
-                        alamat_disp = alamat if len(alamat) <= 200 else alamat[:200] + "…"
-
-                        tags_html = "".join(
-                            f'<span class="tag">{cat}</span>' for cat in kategori_list
-                        )
-                        badge_html = get_source_badge_html(sumber)
-
-                        card_html = f"""
-                        <div class="org-card">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
-                                <div class="org-name">{nama}</div>
-                                <div>{badge_html}</div>
-                            </div>
-                            <div class="org-address">{alamat_disp}</div>
-                            <div class="org-meta">
-                                <span class="label">Service Contact:</span>
-                                {'-' if not kontak else kontak}
-                            </div>
-                            <div class="org-meta">
-                                <span class="label">Service Email:</span>
-                                {'-' if not email else email}
-                            </div>
-                            <div class="org-meta">
-                                <span class="label">Service Categories:</span><br/>
-                                {tags_html if tags_html else '<span class="tag">Not specified</span>'}
-                            </div>
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-
-                        bcol1, bcol2 = st.columns(2)
-
-                        # Tombol usulan koreksi → simpan target + pesan dengan link ke anchor form
-                        with bcol1:
-                            if st.button(
-                                "✏️ Usulkan koreksi",
-                                key=f"suggest_{start_idx + idx_row}",
-                                use_container_width=True,
-                            ):
-                                st.session_state["koreksi_target_org"] = nama
-                                st.session_state["koreksi_hint"] = (
-                                    f"Lembaga **{nama}** sudah otomatis dipilih di bagian "
-                                    "[Usulan Koreksi Cepat](#usulan-koreksi-cepat)."
-                                )
-                                st.rerun()
-
-                        with bcol2:
-                            if st.button(
-                                "👁 Lihat detail",
-                                key=f"detail_{start_idx + idx_row}",
-                                use_container_width=True,
-                            ):
-                                st.session_state["detail_org"] = nama
-                                st.session_state["show_detail"] = True
-                                st.rerun()
-
-        # ---------- DETAIL SECTION ----------
-        if st.session_state.get("show_detail") and st.session_state.get("detail_org"):
-            org_name = st.session_state["detail_org"]
-            detail_df = df[df["Nama Organisasi"] == org_name]
-            if not detail_df.empty:
-                r = detail_df.iloc[0]
-                sumber = safe_str(r.get("Sumber Data", ""))
-                badge_html = get_source_badge_html(sumber)
-
-                st.markdown("---")
-                st.markdown("#### 👁 Profil Lembaga (Detail)")
                 st.markdown(
-                    f"<div style='display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;'>"
-                    f"<div><b>{safe_str(r.get('Nama Organisasi', ''))}</b></div>"
-                    f"<div>{badge_html}</div>"
-                    f"</div>",
+                    "<div class='detail-box'>",
                     unsafe_allow_html=True,
                 )
 
-                col_a, col_b = st.columns([2, 1])
-                with col_a:
-                    st.markdown("**Alamat**")
-                    st.write(safe_str(r.get("Alamat Organisasi", "")) or "—")
+                st.markdown(
+                    "<div class='detail-title'>Detail lembaga</div>",
+                    unsafe_allow_html=True,
+                )
 
-                    st.markdown("**Kontak Layanan**")
-                    st.write(safe_str(r.get("Kontak Lembaga/Layanan", "")) or "—")
-
-                    st.markdown("**Email Layanan**")
-                    st.write(safe_str(r.get("Email Lembaga", "")) or "—")
-
-                    st.markdown("**Profil Organisasi**")
-                    st.write(safe_str(r.get("Profil Organisasi", "")) or "—")
-
-                with col_b:
-                    st.markdown("**Koordinat Lokasi**")
-                    lat = safe_str(r.get("Latitude", ""))
-                    lon = safe_str(r.get("Longitude", ""))
-                    if lat and lon:
-                        st.write(f"Lat: `{lat}`, Lon: `{lon}`")
-                    else:
-                        st.write(
-                            "Belum ada koordinat latitude/longitude. "
-                            "Dapat diusulkan melalui koreksi data."
-                        )
-
-                    st.markdown("**Kategori Layanan**")
-                    kat = r.get("kategori_layanan", [])
-                    if isinstance(kat, (list, tuple)) and kat:
-                        for c in kat:
-                            st.markdown(f"- {c}")
-                    else:
-                        st.write("—")
+                st.markdown("**Profil Organisasi**")
+                profil = safe_str(r.get("Profil Organisasi", ""))
+                st.write(profil if profil else "—")
 
                 st.markdown("**Layanan yang diberikan**")
                 layanan_list = r.get("layanan_list", [])
@@ -718,164 +766,181 @@ with tab_dir:
 
         # ---------- TABEL + DOWNLOAD ----------
         with st.expander("📋 Tampilkan semua hasil dalam bentuk tabel"):
-            table_df = filtered.copy()
-            cols_table = [
-                c
-                for c in [
+            table_df = filtered[
+                [
                     "Nama Organisasi",
                     "Alamat Organisasi",
                     "Kontak Lembaga/Layanan",
                     "Email Lembaga",
-                    "kategori_layanan",
+                    "Profil Organisasi",
+                    "Layanan Yang Diberikan",
                     "Sumber Data",
-                    "Latitude",
-                    "Longitude",
                 ]
-                if c in table_df.columns
-            ]
-            table_df = table_df[cols_table].copy()
-
-            if "kategori_layanan" in table_df.columns:
-                table_df["kategori_layanan"] = table_df["kategori_layanan"].apply(
-                    lambda x: ", ".join(x)
-                    if isinstance(x, (list, tuple))
-                    else safe_str(x)
-                )
-
-            table_df = table_df.rename(
-                columns={
-                    "Nama Organisasi": "Organisation Name",
-                    "Alamat Organisasi": "Address",
-                    "Kontak Lembaga/Layanan": "Service Contact",
-                    "Email Lembaga": "Service Email",
-                    "kategori_layanan": "Service Categories",
-                    "Sumber Data": "Source",
-                }
-            )
-            table_df.insert(0, "No", range(1, len(table_df) + 1))
-
+            ].copy()
             st.dataframe(table_df, use_container_width=True)
 
-            csv_data = table_df.to_csv(index=False).encode("utf-8")
+            csv = table_df.to_csv(index=False).encode("utf-8")
             st.download_button(
-                "⬇️ Download filtered results (CSV)",
-                data=csv_data,
-                file_name="direktori_layanan129_filtered.csv",
+                "⬇️ Unduh hasil pencarian (CSV)",
+                data=csv,
+                file_name="direktori_layanan_129_filtered.csv",
                 mime="text/csv",
             )
 
-        # ---------- USULAN KOREKSI CEPAT (ANCHOR) ----------
-        st.markdown("---")
+        # ---------- LINK CEPAT KE FORM KOREKSI ----------
         st.markdown(
             """
-            <h4 id="usulan-koreksi-cepat" style="margin-top:0.5rem;">
-              ✏️ Usulan Koreksi Cepat
-              <a href="#usulan-koreksi-cepat" style="text-decoration:none;">↪</a>
-            </h4>
+            <div style="margin-top:1.75rem; font-size:0.85rem; color:#6b7280;">
+              Ingin memperbarui atau mengoreksi data lembaga?  
+              <a href="#koreksi-data" class="small-link">Buka tab "Koreksi Data"</a>
+              dan isi formulir perubahan.
+            </div>
             """,
             unsafe_allow_html=True,
         )
 
         st.markdown(
             """
-            Bagian ini untuk **koreksi cepat** dari card di atas.  
-            Jika Anda baru saja klik tombol *"Usulkan koreksi"* pada salah satu lembaga,
-            nama lembaga tersebut **sudah otomatis dipilih** di sini.
-            """
-        )
-
-        org_options_quick = sorted(df["Nama Organisasi"].dropna().unique())
-        default_org_q = st.session_state.get("koreksi_target_org")
-        if default_org_q in org_options_quick:
-            default_index_q = org_options_quick.index(default_org_q)
-        else:
-            default_index_q = 0 if org_options_quick else 0
-
-        suggestions_df_quick = load_suggestions()
-
-        with st.form("quick_suggest_form"):
-            org_name_q = st.selectbox(
-                "Pilih lembaga yang ingin dikoreksi",
-                org_options_quick,
-                index=default_index_q,
-            )
-            pengaju_q = st.text_input("Nama Anda")
-            kontak_q = st.text_input("Kontak (email / WA)")
-            kolom_q = st.multiselect(
-                "Bagian yang ingin diubah",
-                [
-                    "Alamat Organisasi",
-                    "Kontak Lembaga/Layanan",
-                    "Email Lembaga",
-                    "Layanan Yang Diberikan",
-                    "Profil Organisasi",
-                    "Koordinat (Latitude/Longitude)",
-                    "Lainnya",
-                ],
-            )
-
-            st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
-            lat_col_q, lon_col_q = st.columns(2)
-            with lat_col_q:
-                lat_val_q = st.text_input("Latitude (contoh: -6.1767)")
-            with lon_col_q:
-                lon_val_q = st.text_input("Longitude (contoh: 106.8305)")
-
-            usulan_q = st.text_area(
-                "Tuliskan data baru / koreksi yang diusulkan",
-                height=120,
-            )
-
-            submit_quick = st.form_submit_button("Kirim Usulan Koreksi Cepat")
-
-            if submit_quick:
-                if not usulan_q.strip() and not (lat_val_q.strip() and lon_val_q.strip()):
-                    st.warning(
-                        "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
-                    )
-                else:
-                    new_id = (
-                        1
-                        if suggestions_df_quick.empty
-                        else int(suggestions_df_quick["id"].max()) + 1
-                    )
-
-                    new_row = {
-                        "id": int(new_id),
-                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "organisasi": org_name_q,
-                        "pengaju": pengaju_q,
-                        "kontak": kontak_q,
-                        "kolom": "; ".join(kolom_q) if kolom_q else "",
-                        "usulan": usulan_q.strip(),
-                        "lat": lat_val_q.strip(),
-                        "lon": lon_val_q.strip(),
-                        "status": "Pending",
-                        "processed_at": "",
-                    }
-                    suggestions_df_quick = pd.concat(
-                        [suggestions_df_quick, pd.DataFrame([new_row])],
-                        ignore_index=True,
-                    )
-                    save_suggestions(suggestions_df_quick)
-
-                    st.session_state["koreksi_target_org"] = org_name_q
-                    st.success(
-                        "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                        "Admin akan meninjau sebelum mengubah data utama."
-                    )
-
-        # ---------- GO UP LINK ----------
-        st.markdown(
-            """
-            <div style='text-align:right; margin-top:0.5rem;'>
-              <a href="#direktori-layanan">
+            <div style="margin-top:0.75rem; text-align:right;">
+              <a href="#direktori-layanan" class="small-link">
                 ⬆️ Kembali ke atas (Direktori Layanan)
               </a>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+
+# ============================================================
+# TAB: SANDINGKAN LOKASI UPTD & FPL
+# ============================================================
+with tab_sanding:
+    st.markdown("### 🔁 Sandingkan Lokasi UPTD PPA dan Jaringan FPL")
+
+    st.markdown(
+        "Halaman ini menampilkan kabupaten/kota yang telah memiliki **UPTD PPA** "
+        "dan **jaringan FPL** di wilayah yang sama, serta wilayah yang baru memiliki "
+        "salah satu jenis layanan."
+    )
+
+    if lokasi_uptd_fpl is None or lokasi_uptd_fpl.empty:
+        st.info("Data lokasi UPTD dan FPL belum tersedia atau belum terpetakan.")
+    else:
+        data_terpetakan = lokasi_uptd_fpl[
+            lokasi_uptd_fpl["Kategori Lokasi"] != "Belum terpetakan"
+        ]
+        total_lokasi = len(data_terpetakan)
+
+        n_both = (lokasi_uptd_fpl["Kategori Lokasi"] == "UPTD & FPL").sum()
+        n_uptd_only = (lokasi_uptd_fpl["Kategori Lokasi"] == "Hanya UPTD").sum()
+        n_fpl_only = (lokasi_uptd_fpl["Kategori Lokasi"] == "Hanya FPL").sum()
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric(
+            "Kab/Kota memiliki UPTD & FPL",
+            int(n_both),
+            f"{(n_both / total_lokasi * 100):.0f}% dari lokasi terpetakan"
+            if total_lokasi
+            else "",
+        )
+        col2.metric(
+            "Kab/Kota hanya UPTD",
+            int(n_uptd_only),
+            f"{(n_uptd_only / total_lokasi * 100):.0f}%"
+            if total_lokasi
+            else "",
+        )
+        col3.metric(
+            "Kab/Kota hanya jaringan FPL",
+            int(n_fpl_only),
+            f"{(n_fpl_only / total_lokasi * 100):.0f}%"
+            if total_lokasi
+            else "",
+        )
+
+        st.markdown("---")
+
+        # Filter provinsi
+        prov_options = (
+            ["Semua provinsi"]
+            + sorted(
+                lokasi_uptd_fpl["Provinsi"]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                    .unique()
+                    .tolist()
+            )
+        )
+        selected_prov = st.selectbox("Filter provinsi", prov_options, index=0)
+
+        if selected_prov != "Semua provinsi":
+            data_tampil = lokasi_uptd_fpl[
+                lokasi_uptd_fpl["Provinsi"].astype(str).str.strip()
+                == selected_prov
+            ]
+        else:
+            data_tampil = lokasi_uptd_fpl.copy()
+
+        # Tabel lokasi dengan UPTD & FPL
+        st.markdown("#### Kab/Kota dengan UPTD **dan** FPL")
+        st.caption(
+            "Tabel berikut memperlihatkan kabupaten/kota yang sudah memiliki UPTD PPA "
+            "dan jaringan FPL sekaligus, termasuk jumlah lembaga pada masing-masing jenis layanan."
+        )
+
+        df_both = (
+            data_tampil[data_tampil["Kategori Lokasi"] == "UPTD & FPL"]
+            .sort_values(["Provinsi", "Kab/Kota"])
+            .rename(
+                columns={
+                    "Provinsi": "Provinsi",
+                    "Kab/Kota": "Kabupaten/Kota",
+                    "jml_uptd": "Jumlah UPTD",
+                    "jml_fpl": "Jumlah lembaga jaringan FPL",
+                    "jml_lembaga": "Total lembaga terdaftar",
+                }
+            )
+        )
+
+        if df_both.empty:
+            st.info(
+                "Belum ada kabupaten/kota yang tercatat memiliki UPTD dan jaringan FPL "
+                "sekaligus untuk pilihan filter saat ini."
+            )
+        else:
+            st.dataframe(df_both, use_container_width=True)
+
+        # Ringkasan status semua lokasi
+        st.markdown("#### Ringkasan status layanan per kabupaten/kota")
+        st.caption(
+            "Daftar di bawah ini menunjukkan status setiap kabupaten/kota: "
+            "apakah telah memiliki UPTD, jaringan FPL, atau keduanya."
+        )
+
+        df_ringkas = (
+            data_tampil.sort_values(["Provinsi", "Kab/Kota"])
+            .rename(
+                columns={
+                    "Provinsi": "Provinsi",
+                    "Kab/Kota": "Kabupaten/Kota",
+                    "jml_uptd": "Jumlah UPTD",
+                    "jml_fpl": "Jumlah lembaga jaringan FPL",
+                    "Kategori Lokasi": "Status layanan di kab/kota",
+                }
+            )[
+                [
+                    "Provinsi",
+                    "Kabupaten/Kota",
+                    "Status layanan di kab/kota",
+                    "Jumlah UPTD",
+                    "Jumlah lembaga jaringan FPL",
+                ]
+            ]
+        )
+
+        st.dataframe(df_ringkas, use_container_width=True)
+
 
 # ============================================================
 # TAB: KOREKSI DATA (FORM LENGKAP)
@@ -888,19 +953,23 @@ with tab_koreksi:
 
     col_info, _ = st.columns([1, 3])
     with col_info:
-        st.metric("Total usulan koreksi yang tercatat", total_suggestions)
+        st.markdown(
+            f"Sudah ada **{total_suggestions}** usulan koreksi yang tersimpan."
+        )
+        st.caption(
+            "Data koreksi ini akan digunakan oleh tim pengelola untuk melakukan "
+            "verifikasi dan pembaruan berkala pada direktori."
+        )
 
-    st.markdown(
-        """
-        Jika Anda **pengelola lembaga** dan menemukan data yang tidak sesuai,
-        silakan mengisi form berikut.  
-        Anda juga dapat menambahkan/merapikan **koordinat lokasi (Latitude & Longitude)** 
-        supaya di masa depan lembaga bisa ditampilkan dalam peta Indonesia.
-        """
-    )
+    st.markdown("---")
+
+    # Quick hint
+    hint = st.session_state.get("koreksi_hint")
+    if hint:
+        st.info(hint)
 
     org_options = sorted(df["Nama Organisasi"].dropna().unique())
-    default_org = st.session_state.get("koreksi_target_org", None)
+    default_org = st.session_state.get("koreksi_target_org")
     if default_org in org_options:
         default_index = org_options.index(default_org)
     else:
@@ -920,150 +989,106 @@ with tab_koreksi:
                 "Alamat Organisasi",
                 "Kontak Lembaga/Layanan",
                 "Email Lembaga",
-                "Layanan Yang Diberikan",
                 "Profil Organisasi",
-                "Koordinat (Latitude/Longitude)",
+                "Layanan Yang Diberikan",
                 "Lainnya",
             ],
         )
-
-        st.markdown("**Opsional – Koordinat Lokasi Lembaga**")
-        lat_col, lon_col = st.columns(2)
-        with lat_col:
-            lat_val = st.text_input("Latitude (contoh: -6.1767)")
-        with lon_col:
-            lon_val = st.text_input("Longitude (contoh: 106.8305)")
-
         usulan = st.text_area(
-            "Tuliskan data baru / koreksi yang diusulkan",
+            "Tuliskan usulan koreksi / tambahan informasi",
             height=150,
         )
 
-        submitted = st.form_submit_button("Kirim Usulan Koreksi")
-
+        submitted = st.form_submit_button("Kirim usulan koreksi")
         if submitted:
-            if not usulan.strip() and not (lat_val.strip() and lon_val.strip()):
-                st.warning(
-                    "Mohon isi perubahan yang diusulkan atau koordinat latitude/longitude."
-                )
-            else:
-                suggestions_df = load_suggestions()
-                new_id = 1 if suggestions_df.empty else int(suggestions_df["id"].max()) + 1
+            now = datetime.datetime.now().isoformat(timespec="seconds")
+            new_row = {
+                "id": (suggestions_df["id"].max() or 0) + 1
+                if not suggestions_df.empty
+                else 1,
+                "timestamp": now,
+                "organisasi": org_name,
+                "pengaju": pengaju,
+                "kontak": kontak,
+                "kolom": "; ".join(kolom),
+                "usulan": usulan,
+                "catatan_internal": "",
+                "status": "baru",
+            }
+            suggestions_df = pd.concat(
+                [suggestions_df, pd.DataFrame([new_row])], ignore_index=True
+            )
+            save_suggestions(suggestions_df)
+            st.success("Terima kasih, usulan koreksi Anda sudah tersimpan.")
+            st.session_state["koreksi_target_org"] = org_name
+            st.session_state["koreksi_hint"] = (
+                "Usulan koreksi terakhir sudah dikirim. "
+                "Tim akan melakukan verifikasi dan pembaruan data."
+            )
 
-                new_row = {
-                    "id": int(new_id),
-                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    "organisasi": org_name,
-                    "pengaju": pengaju,
-                    "kontak": kontak,
-                    "kolom": "; ".join(kolom) if kolom else "",
-                    "usulan": usulan.strip(),
-                    "lat": lat_val.strip(),
-                    "lon": lon_val.strip(),
-                    "status": "Pending",
-                    "processed_at": "",
-                }
-                suggestions_df = pd.concat(
-                    [suggestions_df, pd.DataFrame([new_row])],
-                    ignore_index=True,
-                )
-                save_suggestions(suggestions_df)
-                st.session_state["koreksi_target_org"] = org_name
-                st.success(
-                    "Terima kasih, usulan koreksi Anda sudah tercatat. "
-                    "Admin akan meninjau sebelum mengubah data utama."
-                )
+    with st.expander("📋 Lihat daftar usulan koreksi yang masuk (ringkas)"):
+        if suggestions_df.empty:
+            st.caption("Belum ada usulan koreksi yang tersimpan.")
+        else:
+            st.dataframe(
+                suggestions_df[
+                    [
+                        "timestamp",
+                        "organisasi",
+                        "pengaju",
+                        "kontak",
+                        "kolom",
+                        "status",
+                    ]
+                ].sort_values("timestamp", ascending=False),
+                use_container_width=True,
+            )
+
 
 # ============================================================
-# TAB: ADMIN
+# TAB: ADMIN (RINGKAS)
 # ============================================================
 with tab_admin:
-    st.markdown("### 🗂️ Panel Admin – Review & Approval")
-
-    pwd = st.text_input(
-        "Masukkan admin password untuk mengakses panel:",
-        type="password",
-        key="admin_pwd",
+    st.markdown("### 🗂️ Admin & Ringkasan Data")
+    st.caption(
+        "Halaman ini memberikan gambaran ringkas komposisi data dalam direktori."
     )
 
-    if pwd != "renolds":
-        st.info("Masukkan password yang benar untuk melihat dan mengelola usulan koreksi.")
-    else:
-        suggestions_df = load_suggestions()
+    total_fpl = (df["Sumber Data"] == "Jaringan FPL").sum()
+    total_uptd_prov = (df["Sumber Data"] == "UPTD PPA Provinsi").sum()
+    total_uptd_kab = (df["Sumber Data"] == "UPTD PPA Kab/Kota").sum()
 
-        if suggestions_df.empty:
-            st.caption("Belum ada usulan koreksi yang tercatat.")
-        else:
-            suggestions_df = suggestions_df.sort_values(
-                "timestamp", ascending=False
-            ).reset_index(drop=True)
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Total lembaga (semua sumber)", len(df))
+    col_b.metric("Lembaga jaringan FPL", int(total_fpl))
+    col_c.metric(
+        "UPTD PPA (provinsi + kab/kota)",
+        int(total_uptd_prov + total_uptd_kab),
+    )
 
-            pending_count = (suggestions_df["status"] == "Pending").sum()
-            st.metric("Usulan Pending", pending_count)
+    st.markdown("---")
 
-            for idx, row in suggestions_df.iterrows():
-                status = safe_str(row.get("status", "Pending"))
-                org = safe_str(row.get("organisasi", ""))
-                pengaju = safe_str(row.get("pengaju", "")) or "—"
+    st.markdown("#### Komposisi kategori layanan (berdasarkan teks layanan)")
+    kat_series = (
+        df["kategori_layanan"]
+        .explode()
+        .value_counts()
+        .rename_axis("Kategori")
+        .reset_index(name="Jumlah lembaga")
+    )
+    st.dataframe(kat_series, use_container_width=True)
 
-                title = f"[{status}] {org} (oleh {pengaju})"
-                box = st.expander(title, expanded=(status == "Pending"))
+    st.markdown("---")
+    st.markdown("#### Status file sumber")
+    st.write(f"- File FPL: `{FPL_CSV.name}` – {'✅' if FPL_CSV.exists() else '❌ Tidak ditemukan'}")
+    st.write(
+        f"- File UPTD: `{UPTD_XLSX.name}` – {'✅' if UPTD_XLSX.exists() else '❌ Tidak ditemukan'}"
+    )
+    st.write(
+        f"- File koreksi lokal: `{SUGGEST_PATH.name}` – "
+        f"{'✅' if SUGGEST_PATH.exists() else 'Belum ada, akan dibuat saat pertama kali koreksi dikirim'}"
+    )
 
-                with box:
-                    st.write(f"**Waktu pengajuan**: {safe_str(row.get('timestamp', ''))}")
-                    st.write(f"**Kontak pengaju**: {safe_str(row.get('kontak', '')) or '—'}")
-                    st.write(f"**Bagian yang dikoreksi**: {safe_str(row.get('kolom', '')) or '—'}")
-                    st.write("**Usulan koreksi:**")
-                    st.write(safe_str(row.get("usulan", "")) or "—")
-
-                    lat_s = safe_str(row.get("lat", ""))
-                    lon_s = safe_str(row.get("lon", ""))
-                    if lat_s or lon_s:
-                        st.write("**Usulan Koordinat:**")
-                        st.write(f"Lat: `{lat_s or '-'}`, Lon: `{lon_s or '-'}`")
-
-                    col_a, col_b, col_c = st.columns([1, 1, 3])
-                    current_status = status
-
-                    if col_a.button(
-                        "✅ Approve",
-                        key=f"approve_{int(row['id'])}",
-                        use_container_width=True,
-                    ):
-                        suggestions_df.loc[idx, "status"] = "Approved"
-                        suggestions_df.loc[idx, "processed_at"] = (
-                            datetime.datetime.now(datetime.timezone.utc).isoformat()
-                        )
-                        save_suggestions(suggestions_df)
-                        st.rerun()
-
-                    if col_b.button(
-                        "❌ Reject",
-                        key=f"reject_{int(row['id'])}",
-                        use_container_width=True,
-                    ):
-                        suggestions_df.loc[idx, "status"] = "Rejected"
-                        suggestions_df.loc[idx, "processed_at"] = (
-                            datetime.datetime.now(datetime.timezone.utc).isoformat()
-                        )
-                        save_suggestions(suggestions_df)
-                        st.rerun()
-
-                    col_c.write(f"Status sekarang: **{current_status}**")
-
-            st.markdown("---")
-            st.caption(
-                "Catatan: koordinat yang telah di-approve dapat dimasukkan ke kolom "
-                "`Latitude` dan `Longitude` di file utama untuk keperluan peta."
-            )
-
-            csv_data = suggestions_df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "⬇️ Download semua usulan (CSV) untuk diolah offline",
-                data=csv_data,
-                file_name="edit_suggestions_layanan129.csv",
-                mime="text/csv",
-            )
 
 # ============================================================
 # TAB: TENTANG
@@ -1072,12 +1097,11 @@ with tab_about:
     st.markdown("### ℹ️ Tentang Direktori Layanan 129")
     st.markdown(
         """
-        Direktori ini disusun untuk membantu:
-
-        - Penyintas kekerasan dan pendamping menemukan **lembaga layanan yang relevan dan terdekat**.
-        - Jaringan FPL, UPTD PPA, dan mitra melihat **peta layanan** berdasarkan jenis layanan dan wilayah.
+        Direktori ini disusun untuk membantu pemetaan lembaga layanan yang bekerja
+        dalam pemenuhan hak dan perlindungan korban kekerasan berbasis perempuan dan anak,
+        yang terhubung dengan layanan *hotline* SAPA 129.
         
-        **Sumber data utama:**
+        Sumber data utama meliputi:
         - Jaringan lembaga anggota Forum Pengada Layanan (FPL).
         - UPTD PPA Provinsi (berdasarkan data KemenPPPA).
         - UPTD PPA Kabupaten/Kota (berdasarkan data KemenPPPA).
